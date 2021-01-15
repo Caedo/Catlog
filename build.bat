@@ -1,5 +1,7 @@
 @echo off
 
+if NOT "%Platform%" == "X64" IF NOT "%Platform%" == "x64" (call vcvarsall x64)
+
 set exe_name=Catlog
 set compile_flags= -nologo /Zi /FC /I ../include/
 set linker_flags= glfw3dll.lib gdi32.lib user32.lib kernel32.lib opengl32.lib
