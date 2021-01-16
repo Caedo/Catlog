@@ -10,11 +10,13 @@ enum TokenType {
     Token_Unknown,
     
     Token_Dash,
-    Token_Semicolon,
+    Token_Colon,
     Token_Slash,
     
     Token_Number,
-    Token_String
+    Token_String,
+    
+    Token_EndOfStream
 };
 
 struct Token

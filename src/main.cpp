@@ -43,6 +43,7 @@ struct Time {
 };
 
 enum LogPriority {
+    None, // debug value
     Verbose,
     Debug,
     Info,
