@@ -23,7 +23,9 @@
 
 #include "ImGUI/imgui_demo.cpp"
 
-char testMessage[] = "12-10 13:02:50.071 1901-4229/com.google.android.gms V/AuthZen: Handling delegate intent. \n 13-05 11:12:45.071 1902-4219/com.google.android.gms D/Unity: Handling sdfasdf daf d.";
+char testMessage[] = "12-10 13:02:50.071 1901-4229/com.google.android.gms V/AuthZen: Handling delegate intent. \n 13-05 11:12:45.071 1902-4219/com.google.android.gms D/Unity: Handling sdfasdf daf d. \n \
+13-05 11:12:45.071 1902-4219/com.google.android.gms W/Unity: Handling sdfasdf daf d.\n \
+13-05 11:12:45.071 1902-4219/com.google.android.gms E/Unity: Handling sdfasdf daf d.";
 
 struct cl_string {
     char* data;
@@ -39,17 +41,17 @@ struct Date {
 struct Time {
     int hours;
     int minutes;
-    int seconds;
+    float seconds;
 };
 
 enum LogPriority {
-    None, // debug value
-    Verbose,
-    Debug,
-    Info,
-    Warning,
-    Error,
-    Assert
+    None = 0, // debug value
+    Verbose = 'V',
+    Debug = 'D',
+    Info = 'I',
+    Warning = 'W',
+    Error = 'E',
+    Assert = 'A'
 };
 
 struct LogData {
@@ -67,9 +69,24 @@ struct LogData {
 
 #include "parser.cpp"
 
+
+
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
+
+void DrawMenuBar() {
+    if(ImGui::BeginMainMenuBar()) {
+        if(ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("New")) {}
+            if (ImGui::MenuItem("Open", "Ctrl+O")) {}
+            
+            ImGui::EndMenu();
+        }
+        
+        ImGui::EndMainMenuBar();
+    }
 }
 
 int main()
@@ -136,12 +153,73 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
+        DrawMenuBar();
+        
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
         
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+        
+        ImGui::Begin("Logs");
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg;
+        if (ImGui::BeginTable("##table1", 8, flags))
         {
+            ImGui::TableSetupColumn("Date");
+            ImGui::TableSetupColumn("Time");
+            ImGui::TableSetupColumn("PID");
+            ImGui::TableSetupColumn("TID");
+            ImGui::TableSetupColumn("Package");
+            ImGui::TableSetupColumn("Priority");
+            ImGui::TableSetupColumn("Tag");
+            ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+            
+            for (int logIndex = 0; logIndex < messagesCount; logIndex++)
+            {
+                ImGui::TableNextRow();
+                LogData* log = (logs + logIndex);
+                
+                if(log->priority == Warning) {
+                    ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
+                }
+                else if(log->priority == Error) {
+                    ImU32 color = ImGui::GetColorU32(ImVec4(0.9f, 0.1f, 0.1f, 1));
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
+                }
+                
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%d-%d", log->date.day, log->date.month);
+                
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%d:%d:%f", log->time.hours, log->time.minutes, log->time.seconds);
+                
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%d", log->PID);
+                
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%d", log->TID);
+                
+                ImGui::TableSetColumnIndex(4);
+                ImGui::Text(log->package);
+                
+                ImGui::TableSetColumnIndex(5);
+                ImGui::Text("%c", (char) log->priority);
+                
+                ImGui::TableSetColumnIndex(6);
+                ImGui::Text(log->tag);
+                
+                ImGui::TableSetColumnIndex(7);
+                ImGui::Text(log->message);
+            }
+            ImGui::EndTable();
+        }
+        ImGui::End();
+        
+        
+        
+        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+        /*{
             static float f = 0.0f;
             static int counter = 0;
             
@@ -161,17 +239,8 @@ int main()
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
-        }
+        }*/
         
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
         
         // Rendering
         ImGui::Render();
