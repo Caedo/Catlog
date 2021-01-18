@@ -32,6 +32,15 @@ void StringCopy(char* dest, char* source, int length) {
     }
 }
 
+char* GetStringFromToken(Token token) {
+    char* ret = (char*) malloc(token.length + 1);
+
+    StringCopy(ret, token.text, token.length);
+    ret[token.length] = '\0';
+
+    return ret;
+}
+
 // TODO: Add GetNumber function
 float GetFloat(Token token) {
     if(token.length == 0) 
@@ -70,11 +79,21 @@ Token PeekNextToken(Tokenizer* tokenizer) {
     token.text = at;
     
     if(IsNumber(firstChar)) {
-        token.type = Token_Number;
-        
-        while(IsNumber(*at) || *at == '.') {
+        bool haveDashes = false;
+        bool haveColons = false;
+
+        while(IsWhiteSpace(*at) == false) {
+            if(*at == '-')      haveDashes = true;
+            else if(*at == ':') haveColons = true;
+
             at++;
         }
+
+        if(haveColons && haveDashes) 
+            token.type = Token_Unknown;
+        else if(haveColons) token.type = Token_Time;
+        else if(haveDashes) token.type = Token_Date;
+        else                token.type = Token_Number;
         
         token.length = at - token.text;
     }
@@ -87,12 +106,19 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         }
         
         token.length = at - token.text;
+
+        if(token.length == 1) {
+            token.type = Token_SingleCharacter;
+        }
     }
     else {
         switch(firstChar) {
-            case '-': token.type = Token_Dash;  break;
-            case ':': token.type = Token_Colon; break;
-            case '/': token.type = Token_Slash; break;
+            case ':': token.type  = Token_Colon; break;
+
+            // NOTE: Will be probably used to parse Android studio format
+            // case '-': token.type = Token_Dash;  break;
+            // case '/': token.type = Token_Slash; break;
+
             case '\0': token.type = Token_EndOfStream; break;
         }
         
@@ -119,54 +145,63 @@ Token RequireToken(Tokenizer* tokenizer, int expectedType)
     return token;
 }
 
-Date ParseDate(Tokenizer* tokenizer) {
+Date ParseDate(Token token) {
     Date date = {};
     
-    Token dayToken = RequireToken(tokenizer, Token_Number);
-    RequireToken(tokenizer, Token_Dash);
-    Token monthToken = RequireToken(tokenizer, Token_Number);
-    
-    Token optionalDashToken = PeekNextToken(tokenizer);
-    Token yearToken = {};
-    if(optionalDashToken.type == Token_Dash) {
-        Move(tokenizer, optionalDashToken);
-        yearToken = RequireToken(tokenizer, Token_Number);
+    char buff[5];
+
+    // check if 'year' is present
+    char *at = token.text;
+    while(IsNumber(*at)) {
+        at++;
     }
-    
-    if(tokenizer->parsing) {
-        date.day   = GetFloat(dayToken);
-        date.month = GetFloat(monthToken);
-        date.year  = GetFloat(yearToken);
+
+    int firstPartLen = at - token.text;
+    bool yearPresent = firstPartLen > 2;
+
+    if(yearPresent) {
+        StringCopy(buff, token.text, 4);
+        buff[4] = 0;
+
+        date.year = atoi(buff);
+        token.text += 5;
     }
-    
+
+    StringCopy(buff, token.text, 2);
+    buff[2] = 0;
+    date.month = atoi(buff);
+    token.text += 3;
+
+    StringCopy(buff, token.text, 2);
+    buff[2] = 0;
+    date.day = atoi(buff);
+
     return date;
 }
 
-Time ParseTime(Tokenizer* tokenizer) {
+Time ParseTime(Token token) {
     Time time = {};
     
-    Token hoursToken = RequireToken(tokenizer, Token_Number);
-    RequireToken(tokenizer, Token_Colon);
-    Token minutesToken = RequireToken(tokenizer, Token_Number);
-    RequireToken(tokenizer, Token_Colon);
-    Token secondsToken = RequireToken(tokenizer, Token_Number);
+    char buff[7];
     
-    if(tokenizer->parsing) {
-        time.hours   = GetFloat(hoursToken);
-        time.minutes = GetFloat(minutesToken);
-        time.seconds = GetFloat(secondsToken);
-    }
-    
+    StringCopy(buff, token.text, 2);
+    buff[2] = 0;
+    time.hours = atoi(buff);
+    token.text += 3;
+
+    StringCopy(buff, token.text, 2);
+    buff[2] = 0;
+    time.minutes = atoi(buff);
+    token.text += 3;
+
+    StringCopy(buff, token.text, 6);
+    buff[6] = 0;
+    time.seconds = atof(buff);
+
     return time;
 }
 
-LogPriority ParsePriority(Tokenizer* tokenizer) {
-    Token token = RequireToken(tokenizer, Token_String);
-    if(token.length != 1) {
-        tokenizer->parsing = false;
-        return None;
-    }
-    
+LogPriority ParsePriority(Token token) {
     switch(*token.text) {
         case 'V': return Verbose;
         case 'D': return Debug;
@@ -208,6 +243,8 @@ char* GetTextUntilEndOfLine(Tokenizer* tokenizer) {
 }
 
 LogData* ParseMessage(char* message, int* messagesCount) {
+    assert(message != NULL);
+
     LogData* ret = (LogData*) malloc(MAX_MESSAGES * sizeof(LogData));
     
     Tokenizer tokenizer = {};
@@ -218,54 +255,63 @@ LogData* ParseMessage(char* message, int* messagesCount) {
     
     while(tokenizer.parsing && index < MAX_MESSAGES) {
         LogData logData = {};
+
+        bool reachedEndOfLine = false;
+        char* lineStart = tokenizer.position;
         
-        Token testToken = PeekNextToken(&tokenizer);
-        if(testToken.type == Token_EndOfStream) {
-            break;
+        Token token = GetNextToken(&tokenizer);
+        while(reachedEndOfLine == false) {
+            switch(token.type) {
+                case Token_Date: {
+                    logData.date = ParseDate(token);
+                }
+                break;
+
+                case Token_Time: {
+                    logData.time = ParseTime(token);
+                }
+                break;
+
+                case Token_Number: {
+                    if(logData.PID == 0) {
+                        logData.PID = GetFloat(token);
+                    }
+                    else {
+                        logData.TID = GetFloat(token);
+                    }
+                }
+                break;
+
+                case Token_SingleCharacter: {
+                    logData.priority = ParsePriority(token);
+                }
+                break;
+
+                case Token_String: {
+                    logData.tag = GetStringFromToken(token);
+                }
+                break;
+
+                case Token_Colon: {
+                    logData.message = GetTextUntilEndOfLine(&tokenizer);
+                    reachedEndOfLine = true;
+                }
+                break;
+
+                case Token_Unknown: {
+                    tokenizer.position = lineStart;
+                    logData.message = GetTextUntilEndOfLine(&tokenizer);
+                    logData.parseFailed = true;
+
+                    reachedEndOfLine = true;
+                }
+                break;
+            }
+
+            if(reachedEndOfLine == false)
+                token = GetNextToken(&tokenizer);
         }
-        
-        if(testToken.type != Token_Number) {
-            logData.message = GetTextUntilEndOfLine(&tokenizer);
-            ret[index++] = logData;
-            
-            continue;
-        }
-        
-        logData.date = ParseDate(&tokenizer);
-        logData.time = ParseTime(&tokenizer);
-        
-        Token token = RequireToken(&tokenizer, Token_Number);
-        logData.PID = GetFloat(token);
-        
-        PeekAndMoveIfCorrectType(&tokenizer, Token_Dash);
-        
-        token = RequireToken(&tokenizer, Token_Number);
-        logData.TID = GetFloat(token);
-        
-        PeekAndMoveIfCorrectType(&tokenizer, Token_Slash);
-        
-        /*
-        token = RequireToken(&tokenizer, Token_String);
-        logData.package = (char*) malloc((token.length + 1) * sizeof(char));
-        StringCopy(logData.package, token.text, token.length);
-        logData.package[token.length] = 0;
-        */
-        
-        logData.priority = ParsePriority(&tokenizer);
-        
-        PeekAndMoveIfCorrectType(&tokenizer, Token_Slash);
-        
-        token = RequireToken(&tokenizer, Token_String);
-        logData.tag = (char*) malloc((token.length + 1) * sizeof(char));
-        StringCopy(logData.tag, token.text, token.length);
-        logData.tag[token.length] = 0;
-        
-        RequireToken(&tokenizer, Token_Colon);
-        logData.message = GetTextUntilEndOfLine(&tokenizer);
-        
-        if(tokenizer.parsing == false)
-            break;
-        
+
         ret[index++] = logData;
     }
     

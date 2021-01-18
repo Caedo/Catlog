@@ -64,14 +64,16 @@ struct LogData {
     
     LogPriority priority;
     
-    char* package;
     char* tag;
     char* message;
+
+    bool parseFailed;
 };
 
 #include "parser.cpp"
 
 
+bool show_demo_window = false;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -103,6 +105,14 @@ void DrawMenuBar() {
             if (ImGui::MenuItem("New")) {}
             if (ImGui::MenuItem("Open", "Ctrl+O")) {}
             
+            ImGui::EndMenu();
+        }
+
+        if(ImGui::BeginMenu("Help")) {
+            if(ImGui::MenuItem("Show/Hide ImGui help")) {
+                show_demo_window = !show_demo_window;
+            }
+
             ImGui::EndMenu();
         }
         
@@ -151,11 +161,9 @@ int main()
     ImGui_ImplOpenGL3_Init(glsl_version);
     
     // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
-    char* file = LoadFileContent("testmessage_2.txt");
+    char* file = LoadFileContent("message.txt");
     
     int messagesCount;
     LogData* logs = ParseMessage(file, &messagesCount);
@@ -185,14 +193,13 @@ int main()
         
         ImGui::Begin("Logs");
         ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
-        if (ImGui::BeginTable("##table1", 8, flags))
+        if (ImGui::BeginTable("##table1", 7, flags))
         {
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("Date");
             ImGui::TableSetupColumn("Time");
             ImGui::TableSetupColumn("PID");
             ImGui::TableSetupColumn("TID");
-            ImGui::TableSetupColumn("Package");
             ImGui::TableSetupColumn("Priority");
             ImGui::TableSetupColumn("Tag");
             ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
@@ -212,32 +219,34 @@ int main()
                     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
                 }
                 
-                ImGui::TableSetColumnIndex(0);
-                ImGui::Text("%d-%d-%d", log->date.day, log->date.month, log->date.year);
-                
-                ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%d:%d:%.2f", log->time.hours, log->time.minutes, log->time.seconds);
-                
-                ImGui::TableSetColumnIndex(2);
-                ImGui::Text("%d", log->PID);
-                
-                ImGui::TableSetColumnIndex(3);
-                ImGui::Text("%d", log->TID);
-                
-                if(log->package) {
+                if(log->parseFailed == false) {
+                    ImGui::TableSetColumnIndex(0);
+                    if(log->date.year == 0) {
+                        ImGui::Text("%d-%d", log->date.day, log->date.month);
+                    }
+                    else {
+                        ImGui::Text("%d-%d-%d", log->date.day, log->date.month, log->date.year);
+                    }
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%d:%d:%.2f", log->time.hours, log->time.minutes, log->time.seconds);
+                    
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%d", log->PID);
+                    
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%d", log->TID);
+                    
                     ImGui::TableSetColumnIndex(4);
-                    ImGui::Text(log->package);
+                    ImGui::Text("%c", (char) log->priority);
+                    
+                    if(log->tag) {
+                        ImGui::TableSetColumnIndex(5);
+                        ImGui::Text(log->tag);
+                    }
                 }
                 
-                ImGui::TableSetColumnIndex(5);
-                ImGui::Text("%c", (char) log->priority);
-                
-                if(log->package) {
-                    ImGui::TableSetColumnIndex(6);
-                    ImGui::Text(log->tag);
-                }
-                
-                ImGui::TableSetColumnIndex(7);
+                ImGui::TableSetColumnIndex(6);
                 ImGui::TextWrapped(log->message);
             }
             ImGui::EndTable();
