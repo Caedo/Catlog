@@ -1,6 +1,6 @@
 #include "parser.h"
 
-#define MAX_MESSAGES 10
+#define MAX_MESSAGES 200
 
 inline bool IsWhiteSpace(char c) {
     return c == ' '  ||
@@ -78,10 +78,11 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         
         token.length = at - token.text;
     }
-    else if(IsAlpha(firstChar)) {
+    // @HACK: 'package' can sometimes be "?" 
+    else if(IsAlpha(firstChar) || *at == '?') {
         token.type = Token_String;
         
-        while(IsAlpha(*at) || *at == '.') {
+        while(IsAlpha(*at) || *at == '.' || *at == '?') {
             at++;
         }
         
@@ -173,12 +174,24 @@ LogPriority ParsePriority(Tokenizer* tokenizer) {
         case 'W': return Warning;
         case 'E': return Error;
         case 'A': return Assert;
+        case 'F': return Assert;
+        case 'S': return Assert;
         default:  return None;
     }
 }
 
-char* ParseMessage(Tokenizer* tokenizer) {
+void PeekAndMoveIfCorrectType(Tokenizer* tokenizer, int type) {
+    Token token = PeekNextToken(tokenizer);
+    if(token.type == type) {
+        Move(tokenizer, token);
+    }
+}
+
+char* GetTextUntilEndOfLine(Tokenizer* tokenizer) {
     int length = 0;
+    
+    EatWhiteSpaces(tokenizer);
+    
     char* at = tokenizer->position;
     while(*at != '\n' && *at != '\0') {
         length++;
@@ -203,29 +216,44 @@ LogData* ParseMessage(char* message, int* messagesCount) {
     
     int index = 0;
     
-    while(tokenizer.parsing) {
+    while(tokenizer.parsing && index < MAX_MESSAGES) {
         LogData logData = {};
+        
+        Token testToken = PeekNextToken(&tokenizer);
+        if(testToken.type == Token_EndOfStream) {
+            break;
+        }
+        
+        if(testToken.type != Token_Number) {
+            logData.message = GetTextUntilEndOfLine(&tokenizer);
+            ret[index++] = logData;
+            
+            continue;
+        }
+        
         logData.date = ParseDate(&tokenizer);
         logData.time = ParseTime(&tokenizer);
         
         Token token = RequireToken(&tokenizer, Token_Number);
         logData.PID = GetFloat(token);
         
-        RequireToken(&tokenizer, Token_Dash);
+        PeekAndMoveIfCorrectType(&tokenizer, Token_Dash);
         
         token = RequireToken(&tokenizer, Token_Number);
         logData.TID = GetFloat(token);
         
-        RequireToken(&tokenizer, Token_Slash);
+        PeekAndMoveIfCorrectType(&tokenizer, Token_Slash);
         
+        /*
         token = RequireToken(&tokenizer, Token_String);
         logData.package = (char*) malloc((token.length + 1) * sizeof(char));
         StringCopy(logData.package, token.text, token.length);
         logData.package[token.length] = 0;
+        */
         
         logData.priority = ParsePriority(&tokenizer);
         
-        RequireToken(&tokenizer, Token_Slash);
+        PeekAndMoveIfCorrectType(&tokenizer, Token_Slash);
         
         token = RequireToken(&tokenizer, Token_String);
         logData.tag = (char*) malloc((token.length + 1) * sizeof(char));
@@ -233,7 +261,7 @@ LogData* ParseMessage(char* message, int* messagesCount) {
         logData.tag[token.length] = 0;
         
         RequireToken(&tokenizer, Token_Colon);
-        logData.message = ParseMessage(&tokenizer);
+        logData.message = GetTextUntilEndOfLine(&tokenizer);
         
         if(tokenizer.parsing == false)
             break;

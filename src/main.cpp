@@ -51,7 +51,9 @@ enum LogPriority {
     Info = 'I',
     Warning = 'W',
     Error = 'E',
-    Assert = 'A'
+    Assert = 'A',
+    Fatal = 'F',
+    Silent = 'S'
 };
 
 struct LogData {
@@ -74,6 +76,25 @@ struct LogData {
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
+
+char* LoadFileContent(const char* filePath) {
+    char* ret = NULL;
+    
+    FILE* file = fopen(filePath, "rb");
+    if(file) {
+        fseek(file, 0, SEEK_END);
+        long length = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        
+        ret = (char*) malloc((length + 1) * sizeof(char));
+        fread(ret, 1, length, file);
+        ret[length] = '\0';
+        
+        fclose(file);
+    }
+    
+    return ret;
 }
 
 void DrawMenuBar() {
@@ -134,8 +155,10 @@ int main()
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
+    char* file = LoadFileContent("testmessage_2.txt");
+    
     int messagesCount;
-    LogData* logs = ParseMessage(testMessage, &messagesCount);
+    LogData* logs = ParseMessage(file, &messagesCount);
     
     
     // Main loop
@@ -161,9 +184,10 @@ int main()
         
         
         ImGui::Begin("Logs");
-        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg;
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
         if (ImGui::BeginTable("##table1", 8, flags))
         {
+            ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("Date");
             ImGui::TableSetupColumn("Time");
             ImGui::TableSetupColumn("PID");
@@ -189,10 +213,10 @@ int main()
                 }
                 
                 ImGui::TableSetColumnIndex(0);
-                ImGui::Text("%d-%d", log->date.day, log->date.month);
+                ImGui::Text("%d-%d-%d", log->date.day, log->date.month, log->date.year);
                 
                 ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%d:%d:%f", log->time.hours, log->time.minutes, log->time.seconds);
+                ImGui::Text("%d:%d:%.2f", log->time.hours, log->time.minutes, log->time.seconds);
                 
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%d", log->PID);
@@ -200,17 +224,21 @@ int main()
                 ImGui::TableSetColumnIndex(3);
                 ImGui::Text("%d", log->TID);
                 
-                ImGui::TableSetColumnIndex(4);
-                ImGui::Text(log->package);
+                if(log->package) {
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::Text(log->package);
+                }
                 
                 ImGui::TableSetColumnIndex(5);
                 ImGui::Text("%c", (char) log->priority);
                 
-                ImGui::TableSetColumnIndex(6);
-                ImGui::Text(log->tag);
+                if(log->package) {
+                    ImGui::TableSetColumnIndex(6);
+                    ImGui::Text(log->tag);
+                }
                 
                 ImGui::TableSetColumnIndex(7);
-                ImGui::Text(log->message);
+                ImGui::TextWrapped(log->message);
             }
             ImGui::EndTable();
         }
