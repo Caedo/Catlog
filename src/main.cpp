@@ -11,6 +11,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+
 #include "parser.h"
 
 #include "glad.c"
@@ -23,14 +24,8 @@
 
 #include "ImGUI/imgui_demo.cpp"
 
-char testMessage[] = "12-10 13:02:50.071 1901-4229/com.google.android.gms V/AuthZen: Handling delegate intent. \n 13-05 11:12:45.071 1902-4219/com.google.android.gms D/Unity: Handling sdfasdf daf d. \n \
-13-05 11:12:45.071 1902-4219/com.google.android.gms W/Unity: Handling sdfasdf daf d.\n \
-13-05 11:12:45.071 1902-4219/com.google.android.gms E/Unity: Handling sdfasdf daf d.";
+#include <windows.h>
 
-struct cl_string {
-    char* data;
-    int length;
-};
 
 struct Date {
     int year;
@@ -45,15 +40,27 @@ struct Time {
 };
 
 enum LogPriority {
-    None = 0, // debug value
-    Verbose = 'V',
-    Debug = 'D',
-    Info = 'I',
-    Warning = 'W',
-    Error = 'E',
-    Assert = 'A',
-    Fatal = 'F',
-    Silent = 'S'
+    None, // debug value
+    Verbose,
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Assert,
+    Fatal,
+    Silent
+};
+
+char* LogPriorityName[] = {
+    "None",
+    "Verbose",
+    "Debug",
+    "Info",
+    "Warning",
+    "Error",
+    "Assert",
+    "Fatal",
+    "Silent"
 };
 
 struct LogData {
@@ -74,6 +81,197 @@ struct LogData {
 
 
 bool show_demo_window = false;
+
+void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
+{
+    static int id = 0;
+    char name[MAX_PATH];
+    wsprintfA(name, "\\\\.\\pipe\\Catlog.%08x.%08x", GetCurrentProcessId(), id++);
+
+    *read = CreateNamedPipeA(
+        name,
+        PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_BYTE | PIPE_WAIT,
+        1,
+        bufferSize,
+        bufferSize,
+        0,
+        attributes
+    );
+    assert(*read != INVALID_HANDLE_VALUE);
+
+    *write = CreateFileA(
+        name,
+        GENERIC_WRITE,
+        0,
+        attributes,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+        NULL
+    );
+
+    assert(*write != INVALID_HANDLE_VALUE);
+}
+
+#define bufferSize 4096
+
+HANDLE handles[3];
+
+    OVERLAPPED outO = {};
+    OVERLAPPED errO = {};
+
+    char outTemp[bufferSize];
+    char errTemp[bufferSize];
+
+    PROCESS_INFORMATION pinfo;
+
+    HANDLE outEvent;
+    HANDLE errEvent;
+    HANDLE childOutRead;
+    HANDLE childErrRead;
+
+void PipesTest() {
+    BOOL ok;
+
+    SECURITY_ATTRIBUTES sAttribs = {};
+    sAttribs.nLength = sizeof(sAttribs);
+    sAttribs.bInheritHandle = TRUE;
+
+    HANDLE childOutWrite;
+    CreateNamepPipePair(&childOutRead, &childOutWrite, bufferSize, &sAttribs);
+
+    HANDLE childInRead;
+    HANDLE childInWrite;
+    CreateNamepPipePair(&childInRead, &childInWrite, bufferSize, &sAttribs);
+
+    HANDLE childErrWrite;
+    CreateNamepPipePair(&childErrRead, &childErrWrite, bufferSize, &sAttribs);
+
+    STARTUPINFOA sinfo = {};
+    sinfo.cb = sizeof(sinfo);
+    sinfo.dwFlags = STARTF_USESTDHANDLES;
+    sinfo.hStdInput = childInRead;
+    sinfo.hStdOutput = childOutWrite;
+    sinfo.hStdError = childErrWrite;
+    
+
+    ok = CreateProcessA(
+        NULL,
+        TEXT("D:\\AndroidSDK\\platform-tools\\adb.exe logcat"),
+        // TEXT("D:\\Projects\\Cpp\\Catlog\\build\\dummy_logcat.exe"),
+        NULL,
+        NULL,
+        TRUE,
+        0,
+        NULL,
+        NULL,
+        &sinfo,
+        &pinfo
+    );
+
+    assert(ok);
+
+    CloseHandle(pinfo.hThread);
+    CloseHandle(childInRead);
+    CloseHandle(childInWrite);
+    CloseHandle(childOutWrite);
+    CloseHandle(childErrWrite);
+
+
+    outEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+    errEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+
+    handles[0] = outEvent;
+    handles[1] = errEvent;
+    handles[2] = pinfo.hProcess;
+}
+
+void ReadLogcatPipe() {
+    BOOL ok;
+    DWORD count = _countof(handles);
+    while (count != 0)
+    {
+        DWORD wait = WaitForMultipleObjects(count, handles, FALSE, 0);
+        // assert(wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + count);
+        if((wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + count) == false) {
+            if(wait == 0x00000102L) {
+                // printf("Timeout\n");
+            }
+            else if(wait == (DWORD)0xFFFFFFFF) {
+                printf("Error: %d", GetLastError());
+            }
+
+            break;
+        }
+
+        DWORD index = wait - WAIT_OBJECT_0;
+        HANDLE h = handles[index];
+        if (h == outEvent)
+        {
+            if (outO.hEvent != NULL)
+            {
+                DWORD r;
+                if (GetOverlappedResult(childOutRead, &outO, &r, TRUE))
+                {
+                    printf("STDOUT received: %.*s\n", (int)r, outTemp);
+                    memset(&outO, 0, sizeof(outO));
+                }
+                else
+                {
+                    assert(GetLastError() == ERROR_BROKEN_PIPE);
+
+                    handles[index] = handles[count - 1];
+                    count--;
+
+                    CloseHandle(childOutRead);
+                    CloseHandle(outEvent);
+                    continue;
+                }
+            }
+
+            outO.hEvent = outEvent;
+            ReadFile(childOutRead, outTemp, sizeof(outTemp), NULL, &outO);
+        }
+        else if (h == errEvent)
+        {
+            if (errO.hEvent != NULL)
+            {
+                DWORD read;
+                if (GetOverlappedResult(childErrRead, &errO, &read, TRUE))
+                {
+                    printf("STDERR received: %.*s\n", (int)read, errTemp);
+                    memset(&errO, 0, sizeof(errO));
+                }
+                else
+                {
+                    assert(GetLastError() == ERROR_BROKEN_PIPE);
+
+                    handles[index] = handles[count - 1];
+                    count--;
+
+                    CloseHandle(childErrRead);
+                    CloseHandle(errEvent);
+                    continue;
+                }
+            }
+
+            errO.hEvent = errEvent;
+            ReadFile(childErrRead, errTemp, sizeof(errTemp), NULL, &errO);
+        }
+        else if (h == pinfo.hProcess)
+        {
+            handles[index] = handles[count - 1];
+            count--;
+
+            DWORD exitCode;
+            ok = GetExitCodeProcess(pinfo.hProcess, &exitCode);
+            assert(ok);
+            CloseHandle(pinfo.hProcess);
+
+            printf("exit code = %u\n", exitCode);
+        }
+    }
+}
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -162,6 +360,8 @@ int main()
     
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    PipesTest();
     
     char* file = LoadFileContent("message.txt");
     
@@ -178,6 +378,8 @@ int main()
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
+
+        ReadLogcatPipe();
         
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -192,7 +394,17 @@ int main()
         
         
         ImGui::Begin("Logs");
-        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
+                                ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
+                                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
+                                ImGuiTableFlags_ScrollY;
+
+        static ImGuiTextFilter filter;
+        filter.Draw("Tag Filter");
+
+        static int priorityIndex;
+        ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+
         if (ImGui::BeginTable("##table1", 7, flags))
         {
             ImGui::TableSetupScrollFreeze(0, 1);
@@ -207,9 +419,17 @@ int main()
             
             for (int logIndex = 0; logIndex < messagesCount; logIndex++)
             {
-                ImGui::TableNextRow();
                 LogData* log = (logs + logIndex);
-                
+                if(log->priority < priorityIndex) {
+                    continue;
+                }
+
+                if (filter.PassFilter(log->tag) == false) {
+                    continue;
+                }
+
+
+                ImGui::TableNextRow();
                 if(log->priority == Warning) {
                     ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
                     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
@@ -238,7 +458,7 @@ int main()
                     ImGui::Text("%d", log->TID);
                     
                     ImGui::TableSetColumnIndex(4);
-                    ImGui::Text("%c", (char) log->priority);
+                    ImGui::Text("%s", LogPriorityName[log->priority]);
                     
                     if(log->tag) {
                         ImGui::TableSetColumnIndex(5);
