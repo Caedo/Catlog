@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 #include <windows.h>
 
@@ -14,15 +15,18 @@ char* messages[] = {
     "01-18 13:40:04.240  1817  1817 I SystemServiceManager: Starting com.android.server.lights.MiuiLightsService",
 };
 
-int main() {
+int main(int argc, char* argv[]) {
     srand(time(NULL));
-
+    
     int messagesCount = (int) sizeof(messages) / sizeof(*messages);
-
+    
     while(true) {
         int index = rand() % messagesCount;
-        fprintf(stdout, "%s\n", messages[index]);
-
+        
+        DWORD written;
+        char* msg = messages[index];
+        WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), msg, strlen(msg), &written, NULL);
+        
         Sleep(1000);
     }
 }
