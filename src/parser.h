@@ -1,6 +1,8 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "types.h"
+
 // NOTE: That was a lie. This isn't logcat format, this is format
 // that Andoid Studio uses to format logcat logs: 
 // date time PID-TID/package priority/tag: message
@@ -13,9 +15,7 @@
 // NOTE: logcat can show move formats using -v specifier, but they doesn't give
 // more information
 
-struct LogData;
-
-enum TokenType {
+enum Token_Type {
     Token_Unknown,
     
     Token_Colon,
@@ -30,15 +30,15 @@ enum TokenType {
     
     Token_Date,
     Token_Time,
-
+    
     Token_SingleCharacter,
-
+    
     Token_EndOfStream
 };
 
 struct Token
 {
-    TokenType type;
+    Token_Type type;
     
     char* text;
     int length;
@@ -49,6 +49,7 @@ struct Tokenizer {
     bool parsing;
 };
 
+struct LogData;
 // TODO: change pointer to some kind of bucket array
 LogData* ParseMessage(char* message, int* messagesCount);
 

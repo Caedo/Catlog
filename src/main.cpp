@@ -1,20 +1,22 @@
-
-#include "ImGUI/imgui.h"
-#include "ImGUI/imgui_impl_glfw.h"
-#include "ImGUI/imgui_impl_opengl3.h"
 #include <stdio.h>
+
+#include "platform_win32.h"
 
 #define GLFW_DLL
 #define GLFW_INCLUDE_NONE
 
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+#include "ImGUI/imgui.h"
+#include "ImGUI/imgui_impl_glfw.h"
+#include "ImGUI/imgui_impl_opengl3.h"
 
 
 #include "parser.h"
 
 #include "glad.c"
+
 #include "ImGUI/imgui.cpp"
 #include "ImGUI/imgui_draw.cpp"
 #include "ImGUI/imgui_tables.cpp"
@@ -24,254 +26,11 @@
 
 #include "ImGUI/imgui_demo.cpp"
 
-#include <windows.h>
-
-
-struct Date {
-    int year;
-    int month;
-    int day;
-};
-
-struct Time {
-    int hours;
-    int minutes;
-    float seconds;
-};
-
-enum LogPriority {
-    None, // debug value
-    Verbose,
-    Debug,
-    Info,
-    Warning,
-    Error,
-    Assert,
-    Fatal,
-    Silent
-};
-
-char* LogPriorityName[] = {
-    "None",
-    "Verbose",
-    "Debug",
-    "Info",
-    "Warning",
-    "Error",
-    "Assert",
-    "Fatal",
-    "Silent"
-};
-
-struct LogData {
-    Date date;
-    Time time;
-    int PID;
-    int TID;
-    
-    LogPriority priority;
-    
-    char* tag;
-    char* message;
-
-    bool parseFailed;
-};
-
+#include "platform_win32.cpp"
 #include "parser.cpp"
 
 
 bool show_demo_window = false;
-
-void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
-{
-    static int id = 0;
-    char name[MAX_PATH];
-    wsprintfA(name, "\\\\.\\pipe\\Catlog.%08x.%08x", GetCurrentProcessId(), id++);
-
-    *read = CreateNamedPipeA(
-        name,
-        PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
-        PIPE_TYPE_BYTE | PIPE_WAIT,
-        1,
-        bufferSize,
-        bufferSize,
-        0,
-        attributes
-    );
-    assert(*read != INVALID_HANDLE_VALUE);
-
-    *write = CreateFileA(
-        name,
-        GENERIC_WRITE,
-        0,
-        attributes,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-        NULL
-    );
-
-    assert(*write != INVALID_HANDLE_VALUE);
-}
-
-#define bufferSize 4096
-
-HANDLE handles[3];
-
-    OVERLAPPED outO = {};
-    OVERLAPPED errO = {};
-
-    char outTemp[bufferSize];
-    char errTemp[bufferSize];
-
-    PROCESS_INFORMATION pinfo;
-
-    HANDLE outEvent;
-    HANDLE errEvent;
-    HANDLE childOutRead;
-    HANDLE childErrRead;
-
-void PipesTest() {
-    BOOL ok;
-
-    SECURITY_ATTRIBUTES sAttribs = {};
-    sAttribs.nLength = sizeof(sAttribs);
-    sAttribs.bInheritHandle = TRUE;
-
-    HANDLE childOutWrite;
-    CreateNamepPipePair(&childOutRead, &childOutWrite, bufferSize, &sAttribs);
-
-    HANDLE childInRead;
-    HANDLE childInWrite;
-    CreateNamepPipePair(&childInRead, &childInWrite, bufferSize, &sAttribs);
-
-    HANDLE childErrWrite;
-    CreateNamepPipePair(&childErrRead, &childErrWrite, bufferSize, &sAttribs);
-
-    STARTUPINFOA sinfo = {};
-    sinfo.cb = sizeof(sinfo);
-    sinfo.dwFlags = STARTF_USESTDHANDLES;
-    sinfo.hStdInput = childInRead;
-    sinfo.hStdOutput = childOutWrite;
-    sinfo.hStdError = childErrWrite;
-    
-
-    ok = CreateProcessA(
-        NULL,
-        TEXT("D:\\AndroidSDK\\platform-tools\\adb.exe logcat"),
-        // TEXT("D:\\Projects\\Cpp\\Catlog\\build\\dummy_logcat.exe"),
-        NULL,
-        NULL,
-        TRUE,
-        0,
-        NULL,
-        NULL,
-        &sinfo,
-        &pinfo
-    );
-
-    assert(ok);
-
-    CloseHandle(pinfo.hThread);
-    CloseHandle(childInRead);
-    CloseHandle(childInWrite);
-    CloseHandle(childOutWrite);
-    CloseHandle(childErrWrite);
-
-
-    outEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
-    errEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
-
-    handles[0] = outEvent;
-    handles[1] = errEvent;
-    handles[2] = pinfo.hProcess;
-}
-
-void ReadLogcatPipe() {
-    BOOL ok;
-    DWORD count = _countof(handles);
-    while (count != 0)
-    {
-        DWORD wait = WaitForMultipleObjects(count, handles, FALSE, 0);
-        // assert(wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + count);
-        if((wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + count) == false) {
-            if(wait == 0x00000102L) {
-                // printf("Timeout\n");
-            }
-            else if(wait == (DWORD)0xFFFFFFFF) {
-                printf("Error: %d", GetLastError());
-            }
-
-            break;
-        }
-
-        DWORD index = wait - WAIT_OBJECT_0;
-        HANDLE h = handles[index];
-        if (h == outEvent)
-        {
-            if (outO.hEvent != NULL)
-            {
-                DWORD r;
-                if (GetOverlappedResult(childOutRead, &outO, &r, TRUE))
-                {
-                    printf("STDOUT received: %.*s\n", (int)r, outTemp);
-                    memset(&outO, 0, sizeof(outO));
-                }
-                else
-                {
-                    assert(GetLastError() == ERROR_BROKEN_PIPE);
-
-                    handles[index] = handles[count - 1];
-                    count--;
-
-                    CloseHandle(childOutRead);
-                    CloseHandle(outEvent);
-                    continue;
-                }
-            }
-
-            outO.hEvent = outEvent;
-            ReadFile(childOutRead, outTemp, sizeof(outTemp), NULL, &outO);
-        }
-        else if (h == errEvent)
-        {
-            if (errO.hEvent != NULL)
-            {
-                DWORD read;
-                if (GetOverlappedResult(childErrRead, &errO, &read, TRUE))
-                {
-                    printf("STDERR received: %.*s\n", (int)read, errTemp);
-                    memset(&errO, 0, sizeof(errO));
-                }
-                else
-                {
-                    assert(GetLastError() == ERROR_BROKEN_PIPE);
-
-                    handles[index] = handles[count - 1];
-                    count--;
-
-                    CloseHandle(childErrRead);
-                    CloseHandle(errEvent);
-                    continue;
-                }
-            }
-
-            errO.hEvent = errEvent;
-            ReadFile(childErrRead, errTemp, sizeof(errTemp), NULL, &errO);
-        }
-        else if (h == pinfo.hProcess)
-        {
-            handles[index] = handles[count - 1];
-            count--;
-
-            DWORD exitCode;
-            ok = GetExitCodeProcess(pinfo.hProcess, &exitCode);
-            assert(ok);
-            CloseHandle(pinfo.hProcess);
-
-            printf("exit code = %u\n", exitCode);
-        }
-    }
-}
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -305,12 +64,12 @@ void DrawMenuBar() {
             
             ImGui::EndMenu();
         }
-
+        
         if(ImGui::BeginMenu("Help")) {
             if(ImGui::MenuItem("Show/Hide ImGui help")) {
                 show_demo_window = !show_demo_window;
             }
-
+            
             ImGui::EndMenu();
         }
         
@@ -360,14 +119,14 @@ int main()
     
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    PipesTest();
     
     char* file = LoadFileContent("message.txt");
     
-    int messagesCount;
-    LogData* logs = ParseMessage(file, &messagesCount);
+    ProcessData pData = SpawnProcess("D:\\Projects\\C++\\Catlog\\build\\dummy_logcat.exe");
+    char buffer[4096] = {};
     
+    int messagesCount = 0;
+    LogData logs[256] = {};
     
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -378,8 +137,13 @@ int main()
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
-
-        ReadLogcatPipe();
+        
+        if(ReadProcessOut(&pData, buffer)) {
+            ParserResult res = ParseMessage(buffer);
+            for(int i = 0; i < res.messagesCount; i++) {
+                logs[messagesCount++] = res.data[i];
+            }
+        }
         
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -395,16 +159,16 @@ int main()
         
         ImGui::Begin("Logs");
         ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
-                                ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
-                                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
-                                ImGuiTableFlags_ScrollY;
-
+            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
+            ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
+            ImGuiTableFlags_ScrollY;
+        
         static ImGuiTextFilter filter;
         filter.Draw("Tag Filter");
-
+        
         static int priorityIndex;
         ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
-
+        
         if (ImGui::BeginTable("##table1", 7, flags))
         {
             ImGui::TableSetupScrollFreeze(0, 1);
@@ -423,12 +187,12 @@ int main()
                 if(log->priority < priorityIndex) {
                     continue;
                 }
-
+                
                 if (filter.PassFilter(log->tag) == false) {
                     continue;
                 }
-
-
+                
+                
                 ImGui::TableNextRow();
                 if(log->priority == Warning) {
                     ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
@@ -447,7 +211,7 @@ int main()
                     else {
                         ImGui::Text("%d-%d-%d", log->date.day, log->date.month, log->date.year);
                     }
-
+                    
                     ImGui::TableSetColumnIndex(1);
                     ImGui::Text("%d:%d:%.2f", log->time.hours, log->time.minutes, log->time.seconds);
                     
@@ -467,37 +231,12 @@ int main()
                 }
                 
                 ImGui::TableSetColumnIndex(6);
-                ImGui::TextWrapped(log->message);
+                if(log->message)
+                    ImGui::TextWrapped(log->message);
             }
             ImGui::EndTable();
         }
         ImGui::End();
-        
-        
-        
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-        /*{
-            static float f = 0.0f;
-            static int counter = 0;
-            
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-            
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-            
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-            
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-            
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }*/
-        
         
         // Rendering
         ImGui::Render();

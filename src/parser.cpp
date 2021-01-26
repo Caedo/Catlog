@@ -1,7 +1,5 @@
 #include "parser.h"
 
-#define MAX_MESSAGES 200
-
 inline bool IsWhiteSpace(char c) {
     return c == ' '  ||
         c == '\n' ||
@@ -34,10 +32,10 @@ void StringCopy(char* dest, char* source, int length) {
 
 char* GetStringFromToken(Token token) {
     char* ret = (char*) malloc(token.length + 1);
-
+    
     StringCopy(ret, token.text, token.length);
     ret[token.length] = '\0';
-
+    
     return ret;
 }
 
@@ -81,14 +79,14 @@ Token PeekNextToken(Tokenizer* tokenizer) {
     if(IsNumber(firstChar)) {
         bool haveDashes = false;
         bool haveColons = false;
-
+        
         while(IsWhiteSpace(*at) == false) {
             if(*at == '-')      haveDashes = true;
             else if(*at == ':') haveColons = true;
-
+            
             at++;
         }
-
+        
         if(haveColons && haveDashes) 
             token.type = Token_Unknown;
         else if(haveColons) token.type = Token_Time;
@@ -106,7 +104,7 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         }
         
         token.length = at - token.text;
-
+        
         if(token.length == 1) {
             token.type = Token_SingleCharacter;
         }
@@ -114,11 +112,11 @@ Token PeekNextToken(Tokenizer* tokenizer) {
     else {
         switch(firstChar) {
             case ':': token.type  = Token_Colon; break;
-
+            
             // NOTE: Will be probably used to parse Android studio format
             // case '-': token.type = Token_Dash;  break;
             // case '/': token.type = Token_Slash; break;
-
+            
             case '\0': token.type = Token_EndOfStream; break;
         }
         
@@ -149,33 +147,33 @@ Date ParseDate(Token token) {
     Date date = {};
     
     char buff[5];
-
+    
     // check if 'year' is present
     char *at = token.text;
     while(IsNumber(*at)) {
         at++;
     }
-
+    
     int firstPartLen = at - token.text;
     bool yearPresent = firstPartLen > 2;
-
+    
     if(yearPresent) {
         StringCopy(buff, token.text, 4);
         buff[4] = 0;
-
+        
         date.year = atoi(buff);
         token.text += 5;
     }
-
+    
     StringCopy(buff, token.text, 2);
     buff[2] = 0;
     date.month = atoi(buff);
     token.text += 3;
-
+    
     StringCopy(buff, token.text, 2);
     buff[2] = 0;
     date.day = atoi(buff);
-
+    
     return date;
 }
 
@@ -188,16 +186,16 @@ Time ParseTime(Token token) {
     buff[2] = 0;
     time.hours = atoi(buff);
     token.text += 3;
-
+    
     StringCopy(buff, token.text, 2);
     buff[2] = 0;
     time.minutes = atoi(buff);
     token.text += 3;
-
+    
     StringCopy(buff, token.text, 6);
     buff[6] = 0;
     time.seconds = atof(buff);
-
+    
     return time;
 }
 
@@ -242,10 +240,10 @@ char* GetTextUntilEndOfLine(Tokenizer* tokenizer) {
     return str;
 }
 
-LogData* ParseMessage(char* message, int* messagesCount) {
+ParserResult ParseMessage(char* message) {
     assert(message != NULL);
-
-    LogData* ret = (LogData*) malloc(MAX_MESSAGES * sizeof(LogData));
+    
+    ParserResult ret = {};
     
     Tokenizer tokenizer = {};
     tokenizer.position = message;
@@ -253,9 +251,9 @@ LogData* ParseMessage(char* message, int* messagesCount) {
     
     int index = 0;
     
-    while(tokenizer.parsing && index < MAX_MESSAGES) {
+    while(tokenizer.parsing && index < MAX_PARSE_COUNT) {
         LogData logData = {};
-
+        
         bool reachedEndOfLine = false;
         char* lineStart = tokenizer.position;
         
@@ -266,12 +264,12 @@ LogData* ParseMessage(char* message, int* messagesCount) {
                     logData.date = ParseDate(token);
                 }
                 break;
-
+                
                 case Token_Time: {
                     logData.time = ParseTime(token);
                 }
                 break;
-
+                
                 case Token_Number: {
                     if(logData.PID == 0) {
                         logData.PID = GetFloat(token);
@@ -281,40 +279,47 @@ LogData* ParseMessage(char* message, int* messagesCount) {
                     }
                 }
                 break;
-
+                
                 case Token_SingleCharacter: {
                     logData.priority = ParsePriority(token);
                 }
                 break;
-
+                
                 case Token_String: {
                     logData.tag = GetStringFromToken(token);
                 }
                 break;
-
+                
                 case Token_Colon: {
                     logData.message = GetTextUntilEndOfLine(&tokenizer);
                     reachedEndOfLine = true;
                 }
                 break;
-
+                
                 case Token_Unknown: {
                     tokenizer.position = lineStart;
                     logData.message = GetTextUntilEndOfLine(&tokenizer);
                     logData.parseFailed = true;
-
+                    
+                    reachedEndOfLine = true;
+                }
+                break;
+                
+                case Token_EndOfStream: {
+                    tokenizer.parsing = false;
                     reachedEndOfLine = true;
                 }
                 break;
             }
-
+            
             if(reachedEndOfLine == false)
                 token = GetNextToken(&tokenizer);
         }
-
-        ret[index++] = logData;
+        
+        if(tokenizer.parsing)
+            ret.data[index++] = logData;
     }
     
-    *messagesCount = index;
+    ret.messagesCount = index;
     return ret;
 }
