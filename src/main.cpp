@@ -61,6 +61,8 @@ void DrawMenuBar() {
         if(ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New")) {}
             if (ImGui::MenuItem("Open", "Ctrl+O")) {}
+            ImGui::Separator();
+            if (ImGui::MenuItem("Settings")) {}
             
             ImGui::EndMenu();
         }
