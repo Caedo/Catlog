@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include "stretchy_buffer.h"
+
 #include "platform_win32.h"
 
 #define GLFW_DLL
@@ -127,8 +129,7 @@ int main()
     ProcessData pData = SpawnProcess("D:\\Projects\\C++\\Catlog\\build\\dummy_logcat.exe");
     char buffer[4096] = {};
     
-    int messagesCount = 0;
-    LogData logs[256] = {};
+    LogData* logs = NULL;
     
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -143,7 +144,7 @@ int main()
         if(ReadProcessOut(&pData, buffer)) {
             ParserResult res = ParseMessage(buffer);
             for(int i = 0; i < res.messagesCount; i++) {
-                logs[messagesCount++] = res.data[i];
+                stb_sb_push(logs, res.data[i]);
             }
         }
         
@@ -183,7 +184,7 @@ int main()
             ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableHeadersRow();
             
-            for (int logIndex = 0; logIndex < messagesCount; logIndex++)
+            for (int logIndex = 0; logIndex < stb_sb_count(logs); logIndex++)
             {
                 LogData* log = (logs + logIndex);
                 if(log->priority < priorityIndex) {
