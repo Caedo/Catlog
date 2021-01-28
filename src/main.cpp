@@ -112,6 +112,7 @@ int main()
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -153,12 +154,15 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
+        ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+        
         DrawMenuBar();
         
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
         
+        ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
         
         ImGui::Begin("Logs");
         ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
