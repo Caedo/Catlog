@@ -14,25 +14,11 @@
 #include "ImGUI/imgui_impl_glfw.h"
 #include "ImGUI/imgui_impl_opengl3.h"
 
-
 #include "parser.h"
 
-#include "glad.c"
-
-#include "ImGUI/imgui.cpp"
-#include "ImGUI/imgui_draw.cpp"
-#include "ImGUI/imgui_tables.cpp"
-#include "ImGUI/imgui_widgets.cpp"
-#include "ImGUI/imgui_impl_glfw.cpp"
-#include "ImGUI/imgui_impl_opengl3.cpp"
-
-#include "ImGUI/imgui_demo.cpp"
-
-#include "platform_win32.cpp"
-#include "parser.cpp"
-
-
 bool show_demo_window = false;
+
+LogData* logs = NULL;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -81,6 +67,98 @@ void DrawMenuBar() {
     }
 }
 
+void DrawSettingsMenu() {
+    
+}
+
+void DrawLogsWindow() {
+    
+    ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+    ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
+    
+    ImGui::Begin("Logs");
+    ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
+        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
+        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
+        ImGuiTableFlags_ScrollY;
+    
+    static ImGuiTextFilter filter;
+    filter.Draw("Tag Filter");
+    
+    static int priorityIndex;
+    ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+    
+    if (ImGui::BeginTable("##table1", 7, flags))
+    {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Date");
+        ImGui::TableSetupColumn("Time");
+        ImGui::TableSetupColumn("PID");
+        ImGui::TableSetupColumn("TID");
+        ImGui::TableSetupColumn("Priority");
+        ImGui::TableSetupColumn("Tag");
+        ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+        
+        for (int logIndex = 0; logIndex < stb_sb_count(logs); logIndex++)
+        {
+            LogData* log = (logs + logIndex);
+            if(log->priority < priorityIndex) {
+                continue;
+            }
+            
+            if (filter.PassFilter(log->tag) == false) {
+                continue;
+            }
+            
+            
+            ImGui::TableNextRow();
+            if(log->priority == Warning) {
+                ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
+            }
+            else if(log->priority == Error) {
+                ImU32 color = ImGui::GetColorU32(ImVec4(0.9f, 0.1f, 0.1f, 1));
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
+            }
+            
+            if(log->parseFailed == false) {
+                ImGui::TableSetColumnIndex(0);
+                if(log->date.year == 0) {
+                    ImGui::Text("%d-%d", log->date.day, log->date.month);
+                }
+                else {
+                    ImGui::Text("%d-%d-%d", log->date.day, log->date.month, log->date.year);
+                }
+                
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%d:%d:%.2f", log->time.hours, log->time.minutes, log->time.seconds);
+                
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%d", log->PID);
+                
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%d", log->TID);
+                
+                ImGui::TableSetColumnIndex(4);
+                ImGui::Text("%s", LogPriorityName[log->priority]);
+                
+                if(log->tag) {
+                    ImGui::TableSetColumnIndex(5);
+                    ImGui::Text(log->tag);
+                }
+            }
+            
+            ImGui::TableSetColumnIndex(6);
+            if(log->message)
+                ImGui::TextWrapped(log->message);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+    
+}
+
 int main()
 {
     // Setup window
@@ -125,12 +203,8 @@ int main()
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
-    char* file = LoadFileContent("message.txt");
-    
     ProcessData pData = SpawnProcess("D:\\Projects\\C++\\Catlog\\build\\dummy_logcat.exe");
     char buffer[4096] = {};
-    
-    LogData* logs = NULL;
     
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -154,7 +228,7 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
-        ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+        
         
         DrawMenuBar();
         
@@ -162,88 +236,7 @@ int main()
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
         
-        ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
-        
-        ImGui::Begin("Logs");
-        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
-            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
-            ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
-            ImGuiTableFlags_ScrollY;
-        
-        static ImGuiTextFilter filter;
-        filter.Draw("Tag Filter");
-        
-        static int priorityIndex;
-        ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
-        
-        if (ImGui::BeginTable("##table1", 7, flags))
-        {
-            ImGui::TableSetupScrollFreeze(0, 1);
-            ImGui::TableSetupColumn("Date");
-            ImGui::TableSetupColumn("Time");
-            ImGui::TableSetupColumn("PID");
-            ImGui::TableSetupColumn("TID");
-            ImGui::TableSetupColumn("Priority");
-            ImGui::TableSetupColumn("Tag");
-            ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableHeadersRow();
-            
-            for (int logIndex = 0; logIndex < stb_sb_count(logs); logIndex++)
-            {
-                LogData* log = (logs + logIndex);
-                if(log->priority < priorityIndex) {
-                    continue;
-                }
-                
-                if (filter.PassFilter(log->tag) == false) {
-                    continue;
-                }
-                
-                
-                ImGui::TableNextRow();
-                if(log->priority == Warning) {
-                    ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
-                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
-                }
-                else if(log->priority == Error) {
-                    ImU32 color = ImGui::GetColorU32(ImVec4(0.9f, 0.1f, 0.1f, 1));
-                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
-                }
-                
-                if(log->parseFailed == false) {
-                    ImGui::TableSetColumnIndex(0);
-                    if(log->date.year == 0) {
-                        ImGui::Text("%d-%d", log->date.day, log->date.month);
-                    }
-                    else {
-                        ImGui::Text("%d-%d-%d", log->date.day, log->date.month, log->date.year);
-                    }
-                    
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::Text("%d:%d:%.2f", log->time.hours, log->time.minutes, log->time.seconds);
-                    
-                    ImGui::TableSetColumnIndex(2);
-                    ImGui::Text("%d", log->PID);
-                    
-                    ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("%d", log->TID);
-                    
-                    ImGui::TableSetColumnIndex(4);
-                    ImGui::Text("%s", LogPriorityName[log->priority]);
-                    
-                    if(log->tag) {
-                        ImGui::TableSetColumnIndex(5);
-                        ImGui::Text(log->tag);
-                    }
-                }
-                
-                ImGui::TableSetColumnIndex(6);
-                if(log->message)
-                    ImGui::TextWrapped(log->message);
-            }
-            ImGui::EndTable();
-        }
-        ImGui::End();
+        DrawLogsWindow();
         
         // Rendering
         ImGui::Render();
