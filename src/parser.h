@@ -31,6 +31,8 @@ enum Token_Type {
     Token_Date,
     Token_Time,
     
+    Token_Equal,
+    
     Token_SingleCharacter,
     
     Token_EndOfStream
@@ -41,7 +43,7 @@ struct Token
     Token_Type type;
     
     char* text;
-    int length;
+    s32 length;
 };
 
 struct Tokenizer {
@@ -50,6 +52,7 @@ struct Tokenizer {
 };
 
 struct LogData;
+
 // TODO: change pointer to some kind of bucket array
 LogData* ParseMessage(char* message, int* messagesCount);
 

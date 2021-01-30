@@ -3,6 +3,8 @@
 
 #include <windows.h>
 
+#include "types.h"
+
 #define BUFFER_SIZE 4096
 
 struct ProcessData {

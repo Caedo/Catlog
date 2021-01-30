@@ -71,6 +71,9 @@ struct ParserResult {
     int messagesCount;
 };
 
-
+struct Settings {
+    bool isDirty;
+    char pathToAdb[1024]; // TODO: dynamic string?
+};
 
 #endif //TYPES_H

@@ -1,5 +1,5 @@
 #include "platform_win32.h"
-
+#include "types.h"
 
 static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
 {
@@ -191,4 +191,26 @@ int CloseProcess(ProcessData* data) {
     CloseHandle(data->pinfo.hProcess);
     
     return 0;
+}
+
+bool OpenFileDialog(char* pathBuffer, s32 maxPath) {
+    OPENFILENAME ofn = {};       // common dialog box structure
+    
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = NULL; // TODO: Add GLFW window handle
+    ofn.lpstrFile = pathBuffer;
+    // Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
+    // use the contents of szFile to initialize itself.
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = maxPath;
+    ofn.lpstrFilter = "All\0*.*\0Text\0*.TXT\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_PATHMUSTEXIST;
+    
+    // Display the Open dialog box. 
+    
+    return GetOpenFileName(&ofn) == TRUE;
 }

@@ -30,6 +30,20 @@ void StringCopy(char* dest, char* source, int length) {
     }
 }
 
+bool IsTokenEqual(Token token, char* match) {
+    char* at = match;
+    for (int i = 0; i < token.length; i++)
+    {
+        if(*at == 0 || token.text[i] != *at) {
+            return false;
+        }
+        
+        at++;
+    }
+    
+    return *at == 0;
+}
+
 char* GetStringFromToken(Token token) {
     char* ret = (char*) malloc(token.length + 1);
     
@@ -95,11 +109,10 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         
         token.length = at - token.text;
     }
-    // @HACK: 'package' can sometimes be "?" 
-    else if(IsAlpha(firstChar) || *at == '?') {
+    else if(IsAlpha(firstChar)) {
         token.type = Token_String;
         
-        while(IsAlpha(*at) || *at == '.' || *at == '?') {
+        while(IsAlpha(*at) || *at == '.' || *at =='_') {
             at++;
         }
         
@@ -111,13 +124,14 @@ Token PeekNextToken(Tokenizer* tokenizer) {
     }
     else {
         switch(firstChar) {
-            case ':': token.type  = Token_Colon; break;
+            case ':': token.type = Token_Colon; break;
+            case '=': token.type = Token_Equal; break;
             
             // NOTE: Will be probably used to parse Android studio format
             // case '-': token.type = Token_Dash;  break;
             // case '/': token.type = Token_Slash; break;
             
-            case '\0': token.type = Token_EndOfStream; break;
+            case '\0': token.type = Token_EndOfStream; tokenizer->parsing = false; break;
         }
         
         token.length = 1;
@@ -240,6 +254,23 @@ char* GetTextUntilEndOfLine(Tokenizer* tokenizer) {
     return str;
 }
 
+void CopyTextUntilEndOfLine(Tokenizer* tokenizer, char* destination) {
+    int length = 0;
+    
+    EatWhiteSpaces(tokenizer);
+    
+    char* at = tokenizer->position;
+    while(*at != '\n' && *at != '\0') {
+        length++;
+        at++;
+    }
+    
+    StringCopy(destination, tokenizer->position, length);
+    destination[length] = 0;
+    
+    tokenizer->position += length;
+}
+
 ParserResult ParseMessage(char* message) {
     assert(message != NULL);
     
@@ -322,4 +353,28 @@ ParserResult ParseMessage(char* message) {
     
     ret.messagesCount = index;
     return ret;
+}
+
+void ParseSettingsFile(Settings* settings, char* fileContent) {
+    assert(fileContent != NULL);
+    
+    ParserResult ret = {};
+    
+    Tokenizer tokenizer = {};
+    tokenizer.position = fileContent;
+    tokenizer.parsing = true;
+    
+    while(tokenizer.parsing) {
+        Token key = RequireToken(&tokenizer, Token_String);
+        RequireToken(&tokenizer, Token_Equal);
+        
+        if(tokenizer.parsing == false) break;
+        
+        if(IsTokenEqual(key, "path_to_adb")) {
+            CopyTextUntilEndOfLine(&tokenizer, settings->pathToAdb);
+        }
+        else {
+            tokenizer.parsing = false;
+        }
+    }
 }

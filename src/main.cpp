@@ -17,13 +17,12 @@
 #include "parser.h"
 
 bool show_demo_window = false;
+bool showSettingsWindow = false;
 
 LogData* logs = NULL;
 
-static void glfw_error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
+Settings settings = {};
+ProcessData process = {};
 
 char* LoadFileContent(const char* filePath) {
     char* ret = NULL;
@@ -44,16 +43,65 @@ char* LoadFileContent(const char* filePath) {
     return ret;
 }
 
+static void glfw_error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
+
+void SaveSettings() {
+    FILE* file = fopen("settings.data", "wb");
+    assert(file);
+    
+    fprintf(file, "path_to_adb = %s", settings.pathToAdb);
+    fclose(file);
+}
+
+void LoadSetting() {
+    char* file = LoadFileContent("settings.data");
+    if(!file) return;
+    
+    
+    ParseSettingsFile(&settings, file);
+    free(file);
+}
+
+
+void DrawSettingsMenu() {
+    //ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+    ImGui::Begin("Settings Window", &showSettingsWindow);
+    
+    ImGui::Text("Path to ADB: %s", settings.pathToAdb);
+    ImGui::SameLine();
+    if(ImGui::Button("Browse...")) {
+        OpenFileDialog(settings.pathToAdb, 1024);
+    }
+    
+    if(ImGui::Button("Save")) {
+        SaveSettings();
+    }
+    
+    // @TODO: Remove later...
+    ImGui::SameLine();
+    if(ImGui::Button("Load")) {
+        LoadSetting();
+    }
+    
+    ImGui::End();
+}
+
 void DrawMenuBar() {
     if(ImGui::BeginMainMenuBar()) {
         if(ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New")) {}
             if (ImGui::MenuItem("Open", "Ctrl+O")) {}
             ImGui::Separator();
-            if (ImGui::MenuItem("Settings")) {}
+            if (ImGui::MenuItem("Settings")) {
+                showSettingsWindow = !showSettingsWindow;
+            }
             
             ImGui::EndMenu();
         }
+        
         
         if(ImGui::BeginMenu("Help")) {
             if(ImGui::MenuItem("Show/Hide ImGui help")) {
@@ -67,10 +115,6 @@ void DrawMenuBar() {
     }
 }
 
-void DrawSettingsMenu() {
-    
-}
-
 void DrawLogsWindow() {
     
     ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
@@ -82,14 +126,26 @@ void DrawLogsWindow() {
         ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
         ImGuiTableFlags_ScrollY;
     
-    static ImGuiTextFilter filter;
-    filter.Draw("Tag Filter");
-    
+    static ImGuiTextFilter tagFilter;
+    static ImGuiTextFilter messageFilter;
     static int priorityIndex;
+    
+    if(ImGui::Button("Start")) {
+        if(settings.pathToAdb[0] != '\0') 
+            process = SpawnProcess(settings.pathToAdb);
+    }
+    
+    tagFilter.Draw("Tag Filter");
+    
+    //ImGui::SameLine();
+    messageFilter.Draw("Message Filter");
+    
+    //ImGui::SameLine();
     ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
     
     if (ImGui::BeginTable("##table1", 7, flags))
     {
+        
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Date");
         ImGui::TableSetupColumn("Time");
@@ -107,7 +163,10 @@ void DrawLogsWindow() {
                 continue;
             }
             
-            if (filter.PassFilter(log->tag) == false) {
+            if (tagFilter.PassFilter(log->tag) == false) {
+                continue;
+            }
+            if (messageFilter.PassFilter(log->message) == false) {
                 continue;
             }
             
@@ -200,11 +259,10 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     
+    LoadSetting();
+    
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    
-    ProcessData pData = SpawnProcess("D:\\Projects\\C++\\Catlog\\build\\dummy_logcat.exe");
-    char buffer[4096] = {};
     
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -215,8 +273,8 @@ int main()
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
-        
-        if(ReadProcessOut(&pData, buffer)) {
+        char buffer[4096];
+        if(process.pinfo.hProcess && ReadProcessOut(&process, buffer)) {
             ParserResult res = ParseMessage(buffer);
             for(int i = 0; i < res.messagesCount; i++) {
                 stb_sb_push(logs, res.data[i]);
@@ -237,6 +295,10 @@ int main()
             ImGui::ShowDemoWindow(&show_demo_window);
         
         DrawLogsWindow();
+        
+        if(showSettingsWindow)
+            DrawSettingsMenu();
+        
         
         // Rendering
         ImGui::Render();
