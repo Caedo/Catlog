@@ -74,6 +74,7 @@ void DrawSettingsMenu() {
     ImGui::SameLine();
     if(ImGui::Button("Browse...")) {
         OpenFileDialog(settings.pathToAdb, 1024);
+        strcat(settings.pathToAdb, " logcat");
     }
     
     if(ImGui::Button("Save")) {
@@ -212,6 +213,10 @@ void DrawLogsWindow() {
             if(log->message)
                 ImGui::TextWrapped(log->message);
         }
+
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+            ImGui::SetScrollHereY(1.0f);
+
         ImGui::EndTable();
     }
     ImGui::End();

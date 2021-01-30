@@ -55,7 +55,7 @@ ProcessData SpawnProcess(char* path) {
     sinfo.hStdError = childErrWrite;
     
     
-    ok = CreateProcessA(
+    ok = CreateProcess(
                         NULL,
                         TEXT(path),
                         NULL,
@@ -208,7 +208,7 @@ bool OpenFileDialog(char* pathBuffer, s32 maxPath) {
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = NULL;
-    ofn.Flags = OFN_PATHMUSTEXIST;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
     
     // Display the Open dialog box. 
     
