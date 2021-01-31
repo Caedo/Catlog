@@ -66,6 +66,22 @@ void LoadSetting() {
 }
 
 
+char PriorityToChar(LogPriority priority) {
+    switch(priority) {
+        case None: return 'N';
+        case Verbose: return 'V';
+        case Debug: return 'D';
+        case Info: return 'I';
+        case Warning: return 'W';
+        case Error: return 'E';
+        case Assert: return 'A';
+        case Fatal: return 'F';
+        case Silent: return 'S';
+    }
+    
+    return '?';
+}
+
 void DrawSettingsMenu() {
     //ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
     ImGui::Begin("Settings Window", &showSettingsWindow);
@@ -131,8 +147,45 @@ void DrawLogsWindow() {
     static int priorityIndex;
     
     if(ImGui::Button("Start")) {
-        if(settings.pathToAdb[0] != '\0') 
-            process = SpawnProcess(settings.pathToAdb);
+        //if(settings.pathToAdb[0] != '\0') 
+        //process = SpawnProcess(settings.pathToAdb);
+        ImGui::OpenPopup("Logcat Settings");
+    }
+    
+    ImGui::SameLine();
+    if(ImGui::Button("Stop")) {
+        if(process.pinfo.hProcess) {
+            CloseProcess(&process);
+        }
+    }
+    
+    if(ImGui::BeginPopupModal("Logcat Settings")) {
+        static int p;
+        ImGui::Combo("Min Priority", &p, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+        
+        static char tag[128]; 
+        ImGui::InputText("Tag", tag, 128);
+        
+        if(ImGui::Button("Start")) {
+            if(settings.pathToAdb[0] != '\0')  {
+                int tagLen = strlen(tag);
+                
+                char* proc = (char*) malloc(strlen(settings.pathToAdb) + tagLen + 10);
+                sprintf(proc, "%s logcat %s:%c", settings.pathToAdb, tag, PriorityToChar((LogPriority)p));
+                
+                process = SpawnProcess(proc);
+                free(proc);
+            }
+            
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::SameLine();
+        if(ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::EndPopup();
     }
     
     tagFilter.Draw("Tag Filter");

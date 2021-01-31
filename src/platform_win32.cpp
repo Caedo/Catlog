@@ -190,6 +190,13 @@ int CloseProcess(ProcessData* data) {
     TerminateProcess(data->pinfo.hProcess, 0);
     CloseHandle(data->pinfo.hProcess);
     
+    CloseHandle(data->outEvent);
+    CloseHandle(data->errEvent);
+    CloseHandle(data->childOutRead);
+    CloseHandle(data->childErrRead);
+    
+    memset(data, 0, sizeof(ProcessData));
+    
     return 0;
 }
 

@@ -112,7 +112,7 @@ Token PeekNextToken(Tokenizer* tokenizer) {
     else if(IsAlpha(firstChar)) {
         token.type = Token_String;
         
-        while(IsAlpha(*at) || *at == '.' || *at =='_') {
+        while(IsWhiteSpace(*at) == false && *at != ':') {
             at++;
         }
         

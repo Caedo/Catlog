@@ -65,6 +65,11 @@ struct LogData {
     bool parseFailed;
 };
 
+struct TagPriorityPair {
+    char priority;
+    char tag[256];
+};
+
 #define MAX_PARSE_COUNT 20
 struct ParserResult {
     LogData data[MAX_PARSE_COUNT];
