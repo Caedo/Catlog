@@ -10,6 +10,8 @@
 struct ProcessData {
     PROCESS_INFORMATION pinfo;
     
+    bool isRunning;
+
     int avaibleHandlesCount;
     HANDLE handles[3];
     

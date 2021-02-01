@@ -57,16 +57,8 @@ char* GetStringFromToken(Token token) {
 float GetFloat(Token token) {
     if(token.length == 0) 
         return 0;
-    
-    // TODO: Get rid off this temporary allocation...
-    char* temp = (char*) malloc(token.length + 1);
-    temp[token.length] = 0;
-    
-    StringCopy(temp, token.text, token.length);
-    
-    float result = atof(temp);
-    free(temp);
-    
+
+    float result = atof(token.text);
     return result;
 }
 
@@ -109,7 +101,7 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         
         token.length = at - token.text;
     }
-    else if(IsAlpha(firstChar)) {
+    else if(IsAlpha(firstChar) || *at == '.') {
         token.type = Token_String;
         
         while(IsWhiteSpace(*at) == false && *at != ':') {

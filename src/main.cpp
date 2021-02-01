@@ -90,7 +90,6 @@ void DrawSettingsMenu() {
     ImGui::SameLine();
     if(ImGui::Button("Browse...")) {
         OpenFileDialog(settings.pathToAdb, 1024);
-        strcat(settings.pathToAdb, " logcat");
     }
     
     if(ImGui::Button("Save")) {
@@ -147,24 +146,24 @@ void DrawLogsWindow() {
     static ImGuiTextFilter messageFilter;
     static int priorityIndex;
     
-    if(ImGui::Button("Start")) {
-        //if(settings.pathToAdb[0] != '\0') 
-        //process = SpawnProcess(settings.pathToAdb);
-        ImGui::OpenPopup("Logcat Settings");
+    if(process.isRunning == false) {
+        if(ImGui::Button("Start")) {
+            ImGui::OpenPopup("Logcat Settings");
+        }
     }
-    
-    ImGui::SameLine();
-    if(ImGui::Button("Stop")) {
-        if(process.pinfo.hProcess) {
-            CloseProcess(&process);
+    else {
+        if(ImGui::Button("Stop")) {
+            if(process.pinfo.hProcess) {
+                CloseProcess(&process);
+            }
         }
     }
     
     if(ImGui::BeginPopupModal("Logcat Settings")) {
-        static int p;
+        static int p = 1;
         ImGui::Combo("Min Priority", &p, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
         
-        static char tag[128]; 
+        static char tag[128] = "*";
         ImGui::InputText("Tag", tag, 128);
         
         if(ImGui::Button("Start")) {
@@ -189,13 +188,18 @@ void DrawLogsWindow() {
         ImGui::EndPopup();
     }
     
-    tagFilter.Draw("Tag Filter");
-    
-    //ImGui::SameLine();
-    messageFilter.Draw("Message Filter");
-    
-    //ImGui::SameLine();
-    ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+    ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
+    {
+        tagFilter.Draw("Tag Filter");
+        
+        ImGui::SameLine();
+        messageFilter.Draw("Message Filter");
+        
+        ImGui::SameLine();
+        ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+    }
+    ImGui::PopItemWidth();
+    ImGui::Text("Count: %d", stb_sb_count(logs));
     
     if (ImGui::BeginTable("##table1", 7, flags))
     {
@@ -331,7 +335,7 @@ int main()
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
-        char buffer[4096];
+        char buffer[8192];
         if(process.pinfo.hProcess && ReadProcessOut(&process, buffer)) {
             ParserResult res = ParseMessage(buffer);
             for(int i = 0; i < res.messagesCount; i++) {

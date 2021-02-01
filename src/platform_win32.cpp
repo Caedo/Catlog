@@ -85,6 +85,7 @@ ProcessData SpawnProcess(char* path) {
     pData.handles[2] = pData.pinfo.hProcess;
     
     pData.avaibleHandlesCount = 3;
+    pData.isRunning = true;
     
     return pData;
 }
@@ -177,6 +178,7 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
         }
         pData->avaibleHandlesCount = 0;
         
+        pData->isRunning = false;
         
         fprintf(stderr, "exit code = %u\n", exitCode);
     }
