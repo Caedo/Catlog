@@ -56,17 +56,17 @@ ProcessData SpawnProcess(char* path) {
     
     
     ok = CreateProcess(
-                        NULL,
-                        TEXT(path),
-                        NULL,
-                        NULL,
-                        TRUE,
-                        CREATE_NO_WINDOW | CREATE_SUSPENDED,
-                        NULL,
-                        NULL,
-                        &sinfo,
-                        &pData.pinfo
-                        );
+                       NULL,
+                       TEXT(path),
+                       NULL,
+                       NULL,
+                       TRUE,
+                       CREATE_NO_WINDOW | CREATE_SUSPENDED,
+                       NULL,
+                       NULL,
+                       &sinfo,
+                       &pData.pinfo
+                       );
     
     assert(ok);
     
@@ -202,7 +202,7 @@ int CloseProcess(ProcessData* data) {
     return 0;
 }
 
-bool OpenFileDialog(char* pathBuffer, s32 maxPath) {
+bool OpenFileDialog(char* pathBuffer, i32 maxPath) {
     OPENFILENAME ofn = {};       // common dialog box structure
     
     ofn.lStructSize = sizeof(ofn);

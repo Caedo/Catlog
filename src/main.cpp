@@ -24,6 +24,8 @@ LogData* logs = NULL;
 Settings settings = {};
 ProcessData process = {};
 
+CL_Array<TagPriorityPair> tags;
+
 char* LoadFileContent(const char* filePath) {
     char* ret = NULL;
     
@@ -148,7 +150,7 @@ void DrawLogsWindow() {
     
     if(process.isRunning == false) {
         if(ImGui::Button("Start")) {
-            ImGui::OpenPopup("Logcat Settings");
+            ImGui::OpenPopup("Logcat Parameters");
         }
     }
     else {
@@ -159,19 +161,56 @@ void DrawLogsWindow() {
         }
     }
     
-    if(ImGui::BeginPopupModal("Logcat Settings")) {
-        static int p = 1;
-        ImGui::Combo("Min Priority", &p, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+    if(ImGui::BeginPopupModal("Logcat Parameters")) {
         
-        static char tag[128] = "*";
-        ImGui::InputText("Tag", tag, 128);
+        ImGui::BeginChild("item view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
+        ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
+        {
+            for(int i = 0; i < tags.count; i++) {
+                ImGui::PushID(i);
+                
+                ImGui::InputText("Tag", tags.data[i].tag, 64);
+                ImGui::SameLine();
+                ImGui::Combo("Min Priority", (int*) (&tags.data[i].priority), LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+                ImGui::SameLine();
+                if(ImGui::Button("X")) {
+                    tags.RemoveAt(i);
+                }
+                
+                ImGui::PopID();
+            }
+        }
+        ImGui::PopItemWidth();
         
+        if(ImGui::Button("Add tag")) {
+            tags.AddEmpty();
+        }
+        
+        ImGui::EndChild();
+        
+        
+        ImGui::Separator();
         if(ImGui::Button("Start")) {
             if(settings.pathToAdb[0] != '\0')  {
-                int tagLen = strlen(tag);
+                i32 pathLen = strlen(settings.pathToAdb);
+                pathLen += strlen(" logcat *:S");
+                //pathLen += strlen(" *:*") * tags.count;
+                for(int i = 0; i < tags.count; i++) {
+                    pathLen += strlen(tags[i].tag) + 3;
+                }
                 
-                char* proc = (char*) malloc(strlen(settings.pathToAdb) + tagLen + 10);
-                sprintf(proc, "%s logcat %s:%c", settings.pathToAdb, tag, PriorityToChar((LogPriority)p));
+                char* proc = (char*) malloc(pathLen + 1);
+                sprintf(proc, "%s logcat", settings.pathToAdb);
+                if(tags.count > 0) {
+                    strcat(proc, " *:S");
+                }
+                
+                for(int i = 0; i < tags.count; i++) {
+                    char buff[70];
+                    sprintf(buff, " %s:%c", tags[i].tag, PriorityToChar(tags[i].priority));
+                    
+                    strcat(proc, buff);
+                }
                 
                 process = SpawnProcess(proc);
                 free(proc);
@@ -230,14 +269,14 @@ void DrawLogsWindow() {
             
             
             ImGui::TableNextRow();
-            if(log->priority == Warning) {
-                ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
-            }
-            else if(log->priority == Error) {
-                ImU32 color = ImGui::GetColorU32(ImVec4(0.9f, 0.1f, 0.1f, 1));
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
-            }
+            // if(log->priority == Warning) {
+            //     ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
+            //     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
+            // }
+            // else if(log->priority == Error) {
+            //     ImU32 color = ImGui::GetColorU32(ImVec4(0.9f, 0.1f, 0.1f, 1));
+            //     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
+            // }
             
             if(log->parseFailed == false) {
                 ImGui::TableSetColumnIndex(0);
@@ -270,10 +309,10 @@ void DrawLogsWindow() {
             if(log->message)
                 ImGui::TextWrapped(log->message);
         }
-
+        
         if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
             ImGui::SetScrollHereY(1.0f);
-
+        
         ImGui::EndTable();
     }
     ImGui::End();

@@ -43,7 +43,7 @@ struct Token
     Token_Type type;
     
     char* text;
-    s32 length;
+    i32 length;
 };
 
 struct Tokenizer {
