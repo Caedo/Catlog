@@ -33,7 +33,21 @@ char PriorityToChar(LogPriority priority) {
     return '?';
 }
 
-LogData messages[] = {
+
+struct TestMessage {
+    Date date;
+    Time time;
+    int PID;
+    int TID;
+    
+    LogPriority priority;
+    
+    char* tag;
+    char* message;
+};
+
+
+TestMessage messages[] = {
     {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Info, "SystemServiceManager", "Starting com.android.server.power.ThermalManagerService"},
     {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Warning, "SystemServer", "Test warning message"},
 };
@@ -45,11 +59,11 @@ int main(int argc, char* argv[]) {
     
     while(true) {
         int index = rand() % messagesCount;
-        LogData log = messages[index];
+        TestMessage log = messages[index];
         
         printf("%d-%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.day, log.date.month, log.date.year, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
         fflush(stdout);
         
-        Sleep(1000);
+        Sleep(500);
     }
 }

@@ -59,10 +59,12 @@ struct LogData {
     
     LogPriority priority;
     
+    char* rawString;
     char* tag;
     char* message;
     
     bool parseFailed;
+    bool messageIncomplete;
 };
 
 struct TagPriorityPair {
@@ -74,11 +76,6 @@ struct TagPriorityPair {
 struct ParserResult {
     LogData data[MAX_PARSE_COUNT];
     int messagesCount;
-};
-
-struct Settings {
-    bool isDirty;
-    char pathToAdb[1024]; // TODO: dynamic string?
 };
 
 

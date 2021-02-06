@@ -14,7 +14,11 @@
 #include "ImGUI/imgui_impl_glfw.h"
 #include "ImGUI/imgui_impl_opengl3.h"
 
+#include "settings.h"
+
 #include "parser.h"
+
+#include "Minitrace/minitrace.h"
 
 bool show_demo_window = false;
 bool showSettingsWindow = false;
@@ -50,23 +54,6 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-void SaveSettings() {
-    FILE* file = fopen("settings.data", "wb");
-    assert(file);
-    
-    fprintf(file, "path_to_adb = %s", settings.pathToAdb);
-    fclose(file);
-}
-
-void LoadSetting() {
-    char* file = LoadFileContent("settings.data");
-    if(!file) return;
-    
-    
-    ParseSettingsFile(&settings, file);
-    free(file);
-}
-
 
 char PriorityToChar(LogPriority priority) {
     switch(priority) {
@@ -88,20 +75,38 @@ void DrawSettingsMenu() {
     //ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
     ImGui::Begin("Settings Window", &showSettingsWindow);
     
-    ImGui::Text("Path to ADB: %s", settings.pathToAdb);
-    ImGui::SameLine();
-    if(ImGui::Button("Browse...")) {
-        OpenFileDialog(settings.pathToAdb, 1024);
+    ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
+    if(ImGui::BeginTabBar("tabs", ImGuiTabBarFlags_None)) {
+        if (ImGui::BeginTabItem("ADB")) {
+            ImGui::Text("Path to ADB: %s", settings.pathToAdb);
+            
+            ImGui::SameLine();
+            if(ImGui::Button("Browse...")) {
+                OpenFileDialog(settings.pathToAdb, 1024);
+            }
+            
+            ImGui::EndTabItem();
+        }
+        
+        if (ImGui::BeginTabItem("Colors")) {
+            ImGui::ColorEdit4("Verbose", (float*) &settings.verboseColor);
+            ImGui::ColorEdit4("Debug", (float*) &settings.debugColor);
+            ImGui::ColorEdit4("Info", (float*) &settings.infoColor);
+            ImGui::ColorEdit4("Warning", (float*) &settings.warningColor);
+            ImGui::ColorEdit4("Error", (float*) &settings.errorColor);
+            ImGui::ColorEdit4("Assert", (float*) &settings.assertColor);
+            
+            ImGui::EndTabItem();
+        }
+        
+        ImGui::EndTabBar();
     }
+    
+    ImGui::EndChild();
+    ImGui::Separator();
     
     if(ImGui::Button("Save")) {
-        SaveSettings();
-    }
-    
-    // @TODO: Remove later...
-    ImGui::SameLine();
-    if(ImGui::Button("Load")) {
-        LoadSetting();
+        SaveSettings(&settings);
     }
     
     ImGui::End();
@@ -161,9 +166,17 @@ void DrawLogsWindow() {
         }
     }
     
+    ImGui::SameLine();
+    if(ImGui::Button("Clear")) {
+        stb_sb_free(logs);
+        logs = NULL;
+    }
+    
+    ImGui::Separator();
+    
     if(ImGui::BeginPopupModal("Logcat Parameters")) {
         
-        ImGui::BeginChild("item view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
+        ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
         ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
         {
             for(int i = 0; i < tags.count; i++) {
@@ -194,7 +207,7 @@ void DrawLogsWindow() {
             if(settings.pathToAdb[0] != '\0')  {
                 i32 pathLen = strlen(settings.pathToAdb);
                 pathLen += strlen(" logcat *:S");
-                //pathLen += strlen(" *:*") * tags.count;
+                
                 for(int i = 0; i < tags.count; i++) {
                     pathLen += strlen(tags[i].tag) + 3;
                 }
@@ -310,8 +323,9 @@ void DrawLogsWindow() {
                 ImGui::TextWrapped(log->message);
         }
         
-        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
             ImGui::SetScrollHereY(1.0f);
+        }
         
         ImGui::EndTable();
     }
@@ -321,6 +335,10 @@ void DrawLogsWindow() {
 
 int main()
 {
+    mtr_init("trace.json");
+    MTR_META_PROCESS_NAME("Catlog");
+    MTR_META_THREAD_NAME("main thread");
+    
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -360,7 +378,7 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     
-    LoadSetting();
+    settings = LoadSetting();
     
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -374,20 +392,24 @@ int main()
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
+        
+        MTR_BEGIN("main", "read adb out");
         char buffer[8192];
         if(process.pinfo.hProcess && ReadProcessOut(&process, buffer)) {
             ParserResult res = ParseMessage(buffer);
+            MTR_BEGIN("main", "logs push");
             for(int i = 0; i < res.messagesCount; i++) {
                 stb_sb_push(logs, res.data[i]);
             }
+            MTR_END("main", "logs push");
         }
+        MTR_END("main", "read adb out");
         
+        MTR_BEGIN("main", "render");
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        
-        
         
         DrawMenuBar();
         
@@ -411,6 +433,7 @@ int main()
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         
         glfwSwapBuffers(window);
+        MTR_END("main", "render");
     }
     
     // Cleanup
@@ -420,6 +443,9 @@ int main()
     
     glfwDestroyWindow(window);
     glfwTerminate();
+    
+    mtr_flush();
+    mtr_shutdown();
     
     return 0;
 }

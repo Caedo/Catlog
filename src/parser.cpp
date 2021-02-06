@@ -1,10 +1,8 @@
 #include "parser.h"
+#include "settings.h"
 
 inline bool IsWhiteSpace(char c) {
-    return c == ' '  ||
-        c == '\n' ||
-        c == '\t' ||
-        c == '\r';
+    return c == ' '  || c == '\t';
 }
 
 inline bool IsEndOfLine(char c) {
@@ -57,7 +55,7 @@ char* GetStringFromToken(Token token) {
 float GetFloat(Token token) {
     if(token.length == 0) 
         return 0;
-
+    
     float result = atof(token.text);
     return result;
 }
@@ -113,6 +111,16 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         if(token.length == 1) {
             token.type = Token_SingleCharacter;
         }
+    }
+    else if(IsEndOfLine(*at)) {
+        token.type = Token_EndOfLine;
+        
+        // Can be multiple characters
+        while(IsEndOfLine(*at)) {
+            at++;
+        }
+        
+        token.length = at - token.text;
     }
     else {
         switch(firstChar) {
@@ -232,7 +240,7 @@ char* GetTextUntilEndOfLine(Tokenizer* tokenizer) {
     EatWhiteSpaces(tokenizer);
     
     char* at = tokenizer->position;
-    while(*at != '\n' && *at != '\0') {
+    while(IsEndOfLine(*at) == false && *at != '\0') {
         length++;
         at++;
     }
@@ -252,7 +260,7 @@ void CopyTextUntilEndOfLine(Tokenizer* tokenizer, char* destination) {
     EatWhiteSpaces(tokenizer);
     
     char* at = tokenizer->position;
-    while(*at != '\n' && *at != '\0') {
+    while(IsEndOfLine(*at) == false && *at != '\0') {
         length++;
         at++;
     }
@@ -315,32 +323,34 @@ ParserResult ParseMessage(char* message) {
                 
                 case Token_Colon: {
                     logData.message = GetTextUntilEndOfLine(&tokenizer);
-                    reachedEndOfLine = true;
                 }
                 break;
                 
                 case Token_Unknown: {
                     tokenizer.position = lineStart;
-                    logData.message = GetTextUntilEndOfLine(&tokenizer);
+                    logData.rawString = GetTextUntilEndOfLine(&tokenizer);
                     logData.parseFailed = true;
                     
                     reachedEndOfLine = true;
                 }
                 break;
                 
+                case Token_EndOfLine: {
+                    ret.data[index++] = logData;
+                    reachedEndOfLine = true;
+                    
+                    continue;
+                }
+                break;
+                
                 case Token_EndOfStream: {
                     tokenizer.parsing = false;
-                    reachedEndOfLine = true;
                 }
                 break;
             }
             
-            if(reachedEndOfLine == false)
-                token = GetNextToken(&tokenizer);
+            token = GetNextToken(&tokenizer);
         }
-        
-        if(tokenizer.parsing)
-            ret.data[index++] = logData;
     }
     
     ret.messagesCount = index;

@@ -2,6 +2,7 @@
 #define PARSER_H
 
 #include "types.h"
+#include "settings.h"
 
 // NOTE: That was a lie. This isn't logcat format, this is format
 // that Andoid Studio uses to format logcat logs: 
@@ -35,6 +36,7 @@ enum Token_Type {
     
     Token_SingleCharacter,
     
+    Token_EndOfLine,
     Token_EndOfStream
 };
 
@@ -55,7 +57,7 @@ struct LogData;
 
 // TODO: change pointer to some kind of bucket array
 LogData* ParseMessage(char* message, int* messagesCount);
-
+void ParseSettingsFile(Settings* settings, char* fileContent);
 
 
 #endif // PARSER_H

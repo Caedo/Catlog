@@ -13,4 +13,8 @@
 #include "platform_win32.cpp"
 #include "parser.cpp"
 
+#include "settings.cpp"
+
+#include "Minitrace/minitrace.c"
+
 #include "main.cpp"
