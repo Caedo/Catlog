@@ -220,9 +220,6 @@ LogPriority ParsePriority(Token token) {
         case 'I': return Info;
         case 'W': return Warning;
         case 'E': return Error;
-        case 'A': return Assert;
-        case 'F': return Assert;
-        case 'S': return Assert;
         default:  return None;
     }
 }

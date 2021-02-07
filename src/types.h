@@ -34,7 +34,6 @@ enum LogPriority {
     Info,
     Warning,
     Error,
-    Assert,
     Fatal,
     Silent
 };
@@ -46,7 +45,6 @@ char* LogPriorityName[] = {
     "Info",
     "Warning",
     "Error",
-    "Assert",
     "Fatal",
     "Silent"
 };

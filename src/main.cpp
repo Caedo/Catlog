@@ -63,7 +63,6 @@ char PriorityToChar(LogPriority priority) {
         case Info: return 'I';
         case Warning: return 'W';
         case Error: return 'E';
-        case Assert: return 'A';
         case Fatal: return 'F';
         case Silent: return 'S';
     }
@@ -89,12 +88,13 @@ void DrawSettingsMenu() {
         }
         
         if (ImGui::BeginTabItem("Colors")) {
-            ImGui::ColorEdit4("Verbose", (float*) &settings.verboseColor);
-            ImGui::ColorEdit4("Debug", (float*) &settings.debugColor);
-            ImGui::ColorEdit4("Info", (float*) &settings.infoColor);
-            ImGui::ColorEdit4("Warning", (float*) &settings.warningColor);
-            ImGui::ColorEdit4("Error", (float*) &settings.errorColor);
-            ImGui::ColorEdit4("Assert", (float*) &settings.assertColor);
+            ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_Float; 
+            
+            ImGui::ColorEdit4("Verbose", (float*) &settings.verboseColor, flags);
+            ImGui::ColorEdit4("Debug", (float*) &settings.debugColor, flags);
+            ImGui::ColorEdit4("Info", (float*) &settings.infoColor, flags);
+            ImGui::ColorEdit4("Warning", (float*) &settings.warningColor, flags);
+            ImGui::ColorEdit4("Error", (float*) &settings.errorColor, flags);
             
             ImGui::EndTabItem();
         }
@@ -184,7 +184,25 @@ void DrawLogsWindow() {
                 
                 ImGui::InputText("Tag", tags.data[i].tag, 64);
                 ImGui::SameLine();
-                ImGui::Combo("Min Priority", (int*) (&tags.data[i].priority), LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+                
+                if (ImGui::BeginCombo("Priority", LogPriorityName[(int)tags.data[i].priority ]))
+                {
+                    // we want to skip "None" priority
+                    for (int n = 1; n < IM_ARRAYSIZE(LogPriorityName); n++)
+                    {
+                        const bool is_selected = ((int) tags.data[n].priority == n);
+                        if (ImGui::Selectable(LogPriorityName[n], is_selected)) {
+                            tags.data[i].priority = (LogPriority) n;
+                        }
+                        
+                        // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                        if (is_selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                
                 ImGui::SameLine();
                 if(ImGui::Button("X")) {
                     tags.RemoveAt(i);
@@ -196,7 +214,10 @@ void DrawLogsWindow() {
         ImGui::PopItemWidth();
         
         if(ImGui::Button("Add tag")) {
-            tags.AddEmpty();
+            TagPriorityPair newPair = {};
+            newPair.priority = Verbose;
+            
+            tags.Add(newPair);
         }
         
         ImGui::EndChild();
@@ -282,14 +303,9 @@ void DrawLogsWindow() {
             
             
             ImGui::TableNextRow();
-            // if(log->priority == Warning) {
-            //     ImU32 color = ImGui::GetColorU32(ImVec4(0.0f, 0.5f, 0.5f, 1));
-            //     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, color);
-            // }
-            // else if(log->priority == Error) {
-            //     ImU32 color = ImGui::GetColorU32(ImVec4(0.9f, 0.1f, 0.1f, 1));
-            //     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
-            // }
+            
+            ImVec4 color = GetColorForPriority(&settings, log->priority);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(color));
             
             if(log->parseFailed == false) {
                 ImGui::TableSetColumnIndex(0);
@@ -321,6 +337,8 @@ void DrawLogsWindow() {
             ImGui::TableSetColumnIndex(6);
             if(log->message)
                 ImGui::TextWrapped(log->message);
+            
+            ImGui::PopStyleColor();
         }
         
         if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
@@ -378,7 +396,8 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     
-    settings = LoadSetting();
+    settings = DefautSettings();
+    LoadSetting(&settings);
     
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

@@ -9,8 +9,6 @@ struct Settings {
     ImVec4 infoColor;
     ImVec4 warningColor;
     ImVec4 errorColor;
-    ImVec4 assertColor;
-    
 };
 
 

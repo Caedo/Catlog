@@ -50,6 +50,10 @@ struct TestMessage {
 TestMessage messages[] = {
     {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Info, "SystemServiceManager", "Starting com.android.server.power.ThermalManagerService"},
     {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Warning, "SystemServer", "Test warning message"},
+    {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Error, "SystemServer", "Test warning message"},
+    {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Assert, "SystemServer", "Test warning message"},
+    {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Verbose, "SystemServer", "Test warning message"},
+    {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Debug, "SystemServer", "Test warning message"},
 };
 
 int main(int argc, char* argv[]) {
