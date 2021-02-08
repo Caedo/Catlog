@@ -155,7 +155,12 @@ void DrawLogsWindow() {
     
     if(process.isRunning == false) {
         if(ImGui::Button("Start")) {
-            ImGui::OpenPopup("Logcat Parameters");
+            if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
+                ImGui::OpenPopup("Logcat Parameters");
+            }
+            else {
+                ImGui::OpenPopup("Set ADB Path");
+            }
         }
     }
     else {
@@ -173,6 +178,44 @@ void DrawLogsWindow() {
     }
     
     ImGui::Separator();
+    
+    
+    bool shouldOpenPopup = false;
+    if(ImGui::BeginPopupModal("Set ADB Path")) {
+        ImGui::BeginChild("Please, set the path :>", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
+        
+        ImGui::Text("Please set path to your adb installation.");
+        ImGui::Text("Path to ADB: %s", settings.pathToAdb);
+        
+        if(ImGui::Button("Browse...")) {
+            OpenFileDialog(settings.pathToAdb, 1024);
+        }
+        
+        ImGui::EndChild();
+        
+        ImGui::Separator();
+        if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
+            if(ImGui::Button("Save and Continue")) {
+                SaveSettings(&settings);
+                
+                ImGui::CloseCurrentPopup();
+                shouldOpenPopup = true;
+            }
+            
+            ImGui::SameLine();
+        }
+        
+        
+        if(ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::EndPopup();
+    }
+    
+    if(shouldOpenPopup) {
+        ImGui::OpenPopup("Logcat Parameters");
+    }
     
     if(ImGui::BeginPopupModal("Logcat Parameters")) {
         
@@ -260,6 +303,7 @@ void DrawLogsWindow() {
         
         ImGui::EndPopup();
     }
+    
     
     ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
     {
