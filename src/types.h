@@ -70,13 +70,6 @@ struct TagPriorityPair {
     LogPriority priority;
 };
 
-#define MAX_PARSE_COUNT 20
-struct ParserResult {
-    LogData data[MAX_PARSE_COUNT];
-    int messagesCount;
-};
-
-
 template<typename T>
 struct CL_Array {
     i32 count;
@@ -131,6 +124,19 @@ struct CL_Array {
         memmove(&data[index], &data[index + 1], sizeof(T) * delta);
         
         count--;
+    }
+    
+    inline void Free() {
+        if(data)
+            free(data);
+        
+        count = 0;
+        capacity = 0;
+    }
+    
+    inline void Clear() {
+        // TODO: Maybe mem set to zero leftover data? 
+        count = 0;
     }
 };
 

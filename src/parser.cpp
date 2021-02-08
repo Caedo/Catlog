@@ -268,10 +268,10 @@ void CopyTextUntilEndOfLine(Tokenizer* tokenizer, char* destination) {
     tokenizer->position += length;
 }
 
-ParserResult ParseMessage(char* message) {
+void ParseMessage(char* message, CL_Array<LogData>* buffer) {
     assert(message != NULL);
     
-    ParserResult ret = {};
+    buffer->Clear();
     
     Tokenizer tokenizer = {};
     tokenizer.position = message;
@@ -279,7 +279,7 @@ ParserResult ParseMessage(char* message) {
     
     int index = 0;
     
-    while(tokenizer.parsing && index < MAX_PARSE_COUNT) {
+    while(tokenizer.parsing) {
         LogData logData = {};
         
         bool reachedEndOfLine = false;
@@ -333,7 +333,7 @@ ParserResult ParseMessage(char* message) {
                 break;
                 
                 case Token_EndOfLine: {
-                    ret.data[index++] = logData;
+                    buffer->Add(logData);
                     reachedEndOfLine = true;
                     
                     continue;
@@ -349,15 +349,10 @@ ParserResult ParseMessage(char* message) {
             token = GetNextToken(&tokenizer);
         }
     }
-    
-    ret.messagesCount = index;
-    return ret;
 }
 
 void ParseSettingsFile(Settings* settings, char* fileContent) {
     assert(fileContent != NULL);
-    
-    ParserResult ret = {};
     
     Tokenizer tokenizer = {};
     tokenizer.position = fileContent;

@@ -459,11 +459,14 @@ int main()
         MTR_BEGIN("main", "read adb out");
         char buffer[8192];
         if(process.pinfo.hProcess && ReadProcessOut(&process, buffer)) {
-            ParserResult res = ParseMessage(buffer);
+            static CL_Array<LogData> parsedLogs = {};
+            ParseMessage(buffer, &parsedLogs);
+            
             MTR_BEGIN("main", "logs push");
-            for(int i = 0; i < res.messagesCount; i++) {
-                stb_sb_push(logs, res.data[i]);
+            for(int i = 0; i < parsedLogs.count; i++) {
+                stb_sb_push(logs, parsedLogs.data[i]);
             }
+            
             MTR_END("main", "logs push");
         }
         MTR_END("main", "read adb out");
