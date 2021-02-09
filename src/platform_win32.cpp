@@ -1,6 +1,8 @@
 #include "platform_win32.h"
 #include "types.h"
 
+#include "Minitrace/minitrace.h"
+
 static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
 {
     static int id = 0;
@@ -98,7 +100,10 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
     
     BOOL ok;
     
+    MTR_BEGIN("main", "wait for objects");
     DWORD wait = WaitForMultipleObjects(pData->avaibleHandlesCount, pData->handles, FALSE, 0);
+    MTR_END("main", "wait for objects");
+    
     if((wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + pData->avaibleHandlesCount) == false) {
         if(wait == (DWORD)0xFFFFFFFF) {
             fprintf(stderr, "Error: %d", GetLastError());
@@ -113,10 +118,11 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
     {
         if (pData->outO.hEvent != NULL)
         {
+            MTR_SCOPE("main", "Overlapped result");
             DWORD r;
             if (GetOverlappedResult(pData->childOutRead, &pData->outO, &r, TRUE))
             {
-                printf("STDOUT received: %.*s\n", (int)r, buffer);
+                //printf("STDOUT received: %.*s\n", (int)r, buffer);
                 memset(&pData->outO, 0, sizeof(pData->outO));
                 
                 return true;
@@ -135,10 +141,14 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
             }
         }
         
+        MTR_BEGIN("main", "Memset");
         memset(buffer, 0, 4096);
+        MTR_END("main", "Memset");
         
+        MTR_BEGIN("main", "Read File");
         pData->outO.hEvent = pData->outEvent;
         ReadFile(pData->childOutRead, buffer, BUFFER_SIZE, NULL, &pData->outO);
+        MTR_END("main", "Read File");
     }
     else if (h == pData->errEvent)
     {
@@ -182,7 +192,6 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
         
         fprintf(stderr, "exit code = %u\n", exitCode);
     }
-    
     
     return false;
 }

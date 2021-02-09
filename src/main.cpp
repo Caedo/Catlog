@@ -71,7 +71,7 @@ char PriorityToChar(LogPriority priority) {
 }
 
 void DrawSettingsMenu() {
-    //ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+    ImGui::SetNextWindowSize(ImVec2(500, 300), ImGuiCond_Once);
     ImGui::Begin("Settings Window", &showSettingsWindow);
     
     ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
@@ -181,6 +181,7 @@ void DrawLogsWindow() {
     
     
     bool shouldOpenPopup = false;
+    ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Once);
     if(ImGui::BeginPopupModal("Set ADB Path")) {
         ImGui::BeginChild("Please, set the path :>", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
         
@@ -217,6 +218,7 @@ void DrawLogsWindow() {
         ImGui::OpenPopup("Logcat Parameters");
     }
     
+    ImGui::SetNextWindowSize(ImVec2(475, 200), ImGuiCond_Once);
     if(ImGui::BeginPopupModal("Logcat Parameters")) {
         
         ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
@@ -318,6 +320,7 @@ void DrawLogsWindow() {
     ImGui::PopItemWidth();
     ImGui::Text("Count: %d", stb_sb_count(logs));
     
+    MTR_BEGIN("main", "table render");
     if (ImGui::BeginTable("##table1", 7, flags))
     {
         
@@ -374,13 +377,13 @@ void DrawLogsWindow() {
                 
                 if(log->tag) {
                     ImGui::TableSetColumnIndex(5);
-                    ImGui::Text(log->tag);
+                    ImGui::Text("%s", log->tag);
                 }
             }
             
             ImGui::TableSetColumnIndex(6);
             if(log->message)
-                ImGui::TextWrapped(log->message);
+                ImGui::TextWrapped("%s", log->message);
             
             ImGui::PopStyleColor();
         }
@@ -391,6 +394,7 @@ void DrawLogsWindow() {
         
         ImGui::EndTable();
     }
+    MTR_END("main", "table render");
     ImGui::End();
     
 }
@@ -460,7 +464,10 @@ int main()
         char buffer[8192];
         if(process.pinfo.hProcess && ReadProcessOut(&process, buffer)) {
             static CL_Array<LogData> parsedLogs = {};
+            
+            MTR_BEGIN("main", "parsing");
             ParseMessage(buffer, &parsedLogs);
+            MTR_END("main", "parsing");
             
             MTR_BEGIN("main", "logs push");
             for(int i = 0; i < parsedLogs.count; i++) {
