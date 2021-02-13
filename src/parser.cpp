@@ -234,7 +234,9 @@ void PeekAndMoveIfCorrectType(Tokenizer* tokenizer, int type) {
 char* GetTextUntilEndOfLine(Tokenizer* tokenizer) {
     int length = 0;
     
-    EatWhiteSpaces(tokenizer);
+    while(*tokenizer->position == ' ') {
+        tokenizer->position++;
+    }
     
     char* at = tokenizer->position;
     while(IsEndOfLine(*at) == false && *at != '\0') {

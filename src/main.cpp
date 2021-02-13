@@ -144,10 +144,6 @@ void DrawLogsWindow() {
     ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
     
     ImGui::Begin("Logs");
-    ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
-        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
-        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
-        ImGuiTableFlags_ScrollY;
     
     static ImGuiTextFilter tagFilter;
     static ImGuiTextFilter messageFilter;
@@ -320,8 +316,13 @@ void DrawLogsWindow() {
     ImGui::PopItemWidth();
     ImGui::Text("Count: %d", stb_sb_count(logs));
     
+    ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
+        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
+        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
+        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+    
     MTR_BEGIN("main", "table render");
-    if (ImGui::BeginTable("##table1", 7, flags))
+    if (ImGui::BeginTable("##table1", 7, tableFlags))
     {
         
         ImGui::TableSetupScrollFreeze(0, 1);
@@ -334,7 +335,11 @@ void DrawLogsWindow() {
         ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
         
-        for (int logIndex = 0; logIndex < stb_sb_count(logs); logIndex++)
+        ImGuiListClipper clipper;
+        clipper.Begin(stb_sb_count(logs));
+        
+        while(clipper.Step())
+            for (int logIndex = clipper.DisplayStart; logIndex < clipper.DisplayEnd; logIndex++)
         {
             LogData* log = (logs + logIndex);
             if(log->priority < priorityIndex) {
@@ -382,8 +387,23 @@ void DrawLogsWindow() {
             }
             
             ImGui::TableSetColumnIndex(6);
-            if(log->message)
-                ImGui::TextWrapped("%s", log->message);
+            if(log->message) {
+                ImGui::TextUnformatted(log->message);
+                
+                float textSize = ImGui::GetItemRectSize().x;
+                float columnSize = ImGui::GetContentRegionAvail().x;
+                if(ImGui::IsItemHovered() && textSize > columnSize) {
+                    
+                    ImGui::BeginTooltip();
+                    
+                    ImGui::PushTextWrapPos(columnSize);
+                    ImGui::Text("Column: %.3f  Text: %.3f", columnSize, textSize);
+                    ImGui::TextWrapped(log->message);
+                    ImGui::PopTextWrapPos();
+                    
+                    ImGui::EndTooltip();
+                }
+            }
             
             ImGui::PopStyleColor();
         }
@@ -513,6 +533,8 @@ int main()
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    
+    CloseProcess(&process);
     
     glfwDestroyWindow(window);
     glfwTerminate();
