@@ -7,7 +7,7 @@ Settings DefautSettings() {
     settings.verboseColor = ImVec4(1, 1, 1, 1);
     settings.debugColor   = ImVec4(1, 1, 1, 1);
     settings.infoColor    = ImVec4(1, 1, 1, 1);
-    settings.warningColor = ImVec4(1, 0.92, 0, 1);
+    settings.warningColor = ImVec4(1, 0.92f, 0, 1);
     settings.errorColor   = ImVec4(1, 0, 0, 1);
     
     return settings;

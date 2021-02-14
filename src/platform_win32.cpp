@@ -1,8 +1,6 @@
 #include "platform_win32.h"
 #include "types.h"
 
-#include "Minitrace/minitrace.h"
-
 static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
 {
     static int id = 0;

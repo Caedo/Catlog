@@ -18,8 +18,6 @@
 
 #include "parser.h"
 
-#include "Minitrace/minitrace.h"
-
 bool show_demo_window = false;
 bool showSettingsWindow = false;
 
@@ -267,11 +265,11 @@ void DrawLogsWindow() {
         ImGui::Separator();
         if(ImGui::Button("Start")) {
             if(settings.pathToAdb[0] != '\0')  {
-                i32 pathLen = strlen(settings.pathToAdb);
-                pathLen += strlen(" logcat *:S");
+                i32 pathLen = (i32) strlen(settings.pathToAdb);
+                pathLen += (i32) strlen(" logcat *:S");
                 
                 for(int i = 0; i < tags.count; i++) {
-                    pathLen += strlen(tags[i].tag) + 3;
+                    pathLen += (i32) strlen(tags[i].tag) + 3;
                 }
                 
                 char* proc = (char*) malloc(pathLen + 1);
@@ -421,9 +419,11 @@ void DrawLogsWindow() {
 
 int main()
 {
+#ifdef MTR_ENABLED
     mtr_init("trace.json");
     MTR_META_PROCESS_NAME("Catlog");
     MTR_META_THREAD_NAME("main thread");
+#endif
     
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -436,7 +436,7 @@ int main()
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Catlog", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
@@ -539,8 +539,10 @@ int main()
     glfwDestroyWindow(window);
     glfwTerminate();
     
+#if MTR_ENABLED
     mtr_flush();
     mtr_shutdown();
+#endif
     
     return 0;
 }

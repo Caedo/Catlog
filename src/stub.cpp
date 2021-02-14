@@ -1,4 +1,13 @@
 
+#ifdef MTR_ENABLED
+#include "Minitrace/minitrace.h"
+#include "Minitrace/minitrace.c"
+#else
+#define MTR_BEGIN
+#define MTR_END
+#define MTR_SCOPE
+#endif
+
 #include "glad.c"
 
 #include "ImGUI/imgui.cpp"
@@ -14,7 +23,5 @@
 #include "parser.cpp"
 
 #include "settings.cpp"
-
-#include "Minitrace/minitrace.c"
 
 #include "main.cpp"

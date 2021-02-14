@@ -56,7 +56,7 @@ float GetFloat(Token token) {
     if(token.length == 0) 
         return 0;
     
-    float result = atof(token.text);
+    float result = (float) atof(token.text);
     return result;
 }
 
@@ -97,7 +97,7 @@ Token PeekNextToken(Tokenizer* tokenizer) {
         else if(haveDashes) token.type = Token_Date;
         else                token.type = Token_Number;
         
-        token.length = at - token.text;
+        token.length = (i32) (at - token.text);
     }
     else if(IsAlpha(firstChar) || *at == '.') {
         token.type = Token_String;
@@ -106,7 +106,7 @@ Token PeekNextToken(Tokenizer* tokenizer) {
             at++;
         }
         
-        token.length = at - token.text;
+        token.length = (i32) (at - token.text);
         
         if(token.length == 1) {
             token.type = Token_SingleCharacter;
@@ -120,7 +120,7 @@ Token PeekNextToken(Tokenizer* tokenizer) {
             at++;
         }
         
-        token.length = at - token.text;
+        token.length = (i32) (at - token.text);
     }
     else {
         switch(firstChar) {
@@ -168,7 +168,7 @@ Date ParseDate(Token token) {
         at++;
     }
     
-    int firstPartLen = at - token.text;
+    int firstPartLen = (i32) (at - token.text);
     bool yearPresent = firstPartLen > 2;
     
     if(yearPresent) {
@@ -208,7 +208,7 @@ Time ParseTime(Token token) {
     
     StringCopy(buff, token.text, 6);
     buff[6] = 0;
-    time.seconds = atof(buff);
+    time.seconds = (float) atof(buff);
     
     return time;
 }
@@ -279,8 +279,6 @@ void ParseMessage(char* message, CL_Array<LogData>* buffer) {
     tokenizer.position = message;
     tokenizer.parsing = true;
     
-    int index = 0;
-    
     while(tokenizer.parsing) {
         LogData logData = {};
         
@@ -302,10 +300,10 @@ void ParseMessage(char* message, CL_Array<LogData>* buffer) {
                 
                 case Token_Number: {
                     if(logData.PID == 0) {
-                        logData.PID = GetFloat(token);
+                        logData.PID = (i32) GetFloat(token);
                     }
                     else {
-                        logData.TID = GetFloat(token);
+                        logData.TID = (i32) GetFloat(token);
                     }
                 }
                 break;
