@@ -34,8 +34,6 @@ static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, S
 
 
 ProcessData SpawnProcess(char* path) {
-    BOOL ok;
-    
     ProcessData pData = {};
     
     SECURITY_ATTRIBUTES sAttribs = {};
@@ -54,31 +52,42 @@ ProcessData SpawnProcess(char* path) {
     sinfo.hStdOutput = childOutWrite;
     sinfo.hStdError = childErrWrite;
     
+    BOOL createResult = CreateProcess(
+                                      NULL,
+                                      TEXT(path),
+                                      NULL,
+                                      NULL,
+                                      TRUE,
+                                      CREATE_NO_WINDOW,
+                                      NULL,
+                                      NULL,
+                                      &sinfo,
+                                      &pData.pinfo
+                                      );
     
-    ok = CreateProcess(
-                       NULL,
-                       TEXT(path),
-                       NULL,
-                       NULL,
-                       TRUE,
-                       CREATE_NO_WINDOW | CREATE_SUSPENDED,
-                       NULL,
-                       NULL,
-                       &sinfo,
-                       &pData.pinfo
-                       );
-    
-    assert(ok);
-    
-    DWORD resumeResult = ResumeThread(pData.pinfo.hThread);
-    assert(resumeResult);
+    if(!createResult) {
+        return {};
+    }
     
     CloseHandle(pData.pinfo.hThread);
     CloseHandle(childOutWrite);
     CloseHandle(childErrWrite);
     
-    pData.outEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
-    pData.errEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+    HANDLE outEventHandle = CreateEvent(NULL, TRUE, TRUE, NULL);
+    HANDLE errorEventHandle = CreateEvent(NULL, TRUE, TRUE, NULL);
+    
+    if(!outEventHandle || !errorEventHandle) {
+        TerminateProcess(pData.pinfo.hProcess, 0);
+        CloseHandle(pData.pinfo.hProcess);
+        
+        if(outEventHandle)   CloseHandle(outEventHandle);
+        if(errorEventHandle) CloseHandle(errorEventHandle);
+        
+        return {};
+    }
+    
+    pData.outEvent = outEventHandle;
+    pData.errEvent = errorEventHandle;
     
     pData.handles[0] = pData.outEvent;
     pData.handles[1] = pData.errEvent;

@@ -289,7 +289,24 @@ void DrawLogsWindow() {
                 free(proc);
             }
             
-            ImGui::CloseCurrentPopup();
+            if(!process.isRunning) {
+                ImGui::OpenPopup("Create Failed");
+            }
+            else {
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        
+        if(ImGui::BeginPopupModal("Create Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            
+            ImGui::Text("Failed to create ADB process!");
+            ImGui::Text("Please make sure that your path to ADB executable is correct.");
+            
+            ImGui::Separator();
+            if(ImGui::Button("Close")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
         
         ImGui::SameLine();
