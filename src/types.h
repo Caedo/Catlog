@@ -82,7 +82,10 @@ struct CL_Array {
         if(capacity >= newSize)
             return;
         
-        T* newData = (T*) malloc(newSize * sizeof(T));
+        int dblSize = capacity * 2;
+        int actualSize = dblSize > newSize ? dblSize : newSize;
+        
+        T* newData = (T*) malloc(actualSize * sizeof(T));
         assert(newData);
         
         if(data) {
@@ -90,7 +93,7 @@ struct CL_Array {
             free(data);
         }
         
-        capacity = newSize;
+        capacity = actualSize;
         data = newData;
     }
     
