@@ -16,14 +16,14 @@ typedef uint64_t u64;
 typedef int64_t i64;
 
 struct Date {
-    int year;
-    int month;
-    int day;
+    i32 day;
+    i32 month;
+    i32 year;
 };
 
 struct Time {
-    int hours;
-    int minutes;
+    i32 hours;
+    i32 minutes;
     float seconds;
 };
 
@@ -52,8 +52,8 @@ char* LogPriorityName[] = {
 struct LogData {
     Date date;
     Time time;
-    int PID;
-    int TID;
+    i32 PID;
+    i32 TID;
     
     LogPriority priority;
     
