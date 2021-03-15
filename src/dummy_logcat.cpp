@@ -63,9 +63,9 @@ int main(int argc, char* argv[]) {
         int index = rand() % messagesCount;
         TestMessage log = messages[index];
         
-        printf("%d-%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.day, log.date.month, log.date.year, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
+        printf("%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.month, log.date.day, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
         fflush(stdout);
         
-        Sleep(500);
+        Sleep(5);
     }
 }
