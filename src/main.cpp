@@ -21,12 +21,19 @@
 bool show_demo_window = false;
 bool showSettingsWindow = false;
 
-LogData* logs = NULL;
+//LogData* logs = NULL;
 
 Settings settings = {};
-ProcessData process = {};
+//ProcessData process = {};
 
-CL_Array<TagPriorityPair> tags;
+//CL_Array<TagPriorityPair> tags;
+
+struct WindowElements{
+    LogData* logs;
+    ProcessData process;
+    CL_Array<TagPriorityPair> tags;
+};
+
 
 char* LoadFileContent(const char* filePath) {
     char* ret = NULL;
@@ -136,7 +143,7 @@ void DrawMenuBar() {
     }
 }
 
-void DrawLogsWindow() {
+void DrawLogsWindow(WindowElements* window_elements) {
     
     ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
     ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
@@ -147,7 +154,7 @@ void DrawLogsWindow() {
     static ImGuiTextFilter messageFilter;
     static int priorityIndex;
     
-    if(process.isRunning == false) {
+    if(window_elements->process.isRunning == false) {
         if(ImGui::Button("Start")) {
             if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
                 ImGui::OpenPopup("Logcat Parameters");
@@ -159,16 +166,16 @@ void DrawLogsWindow() {
     }
     else {
         if(ImGui::Button("Stop")) {
-            if(process.pinfo.hProcess) {
-                CloseProcess(&process);
+            if(window_elements->process.pinfo.hProcess) {
+                CloseProcess(&window_elements->process);
             }
         }
     }
     
     ImGui::SameLine();
     if(ImGui::Button("Clear")) {
-        stb_sb_free(logs);
-        logs = NULL;
+        stb_sb_free(window_elements->logs);
+        window_elements->logs = NULL;
     }
     
     ImGui::Separator();
@@ -218,33 +225,34 @@ void DrawLogsWindow() {
         ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
         ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
         {
-            for(int i = 0; i < tags.count; i++) {
+            for(int i = 0; i < window_elements->tags.count; i++) {
                 ImGui::PushID(i);
                 
-                ImGui::InputText("Tag", tags.data[i].tag, 64);
+                ImGui::InputText("Tag", window_elements->tags.data[i].tag, 64);
                 ImGui::SameLine();
                 
-                if (ImGui::BeginCombo("Priority", LogPriorityName[(int)tags.data[i].priority ]))
+                if (ImGui::BeginCombo("Priority", LogPriorityName[(int)(window_elements->tags.data[i].priority) ]))
                 {
                     // we want to skip "None" priority
                     for (int n = 1; n < IM_ARRAYSIZE(LogPriorityName); n++)
                     {
-                        const bool is_selected = ((int) tags.data[n].priority == n);
+                        const bool is_selected = ((int) (window_elements->tags.data[n].priority == n));
                         if (ImGui::Selectable(LogPriorityName[n], is_selected)) {
-                            tags.data[i].priority = (LogPriority) n;
+                            window_elements->tags.data[i].priority = (LogPriority) n;
                         }
                         
                         // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                         if (is_selected) {
                             ImGui::SetItemDefaultFocus();
                         }
+
                     }
                     ImGui::EndCombo();
                 }
                 
                 ImGui::SameLine();
                 if(ImGui::Button("X")) {
-                    tags.RemoveAt(i);
+                    window_elements->tags.RemoveAt(i);
                 }
                 
                 ImGui::PopID();
@@ -256,7 +264,8 @@ void DrawLogsWindow() {
             TagPriorityPair newPair = {};
             newPair.priority = Verbose;
             
-            tags.Add(newPair);
+            window_elements->tags.Add(newPair);
+            printf("%d\n", window_elements->tags.count);
         }
         
         ImGui::EndChild();
@@ -268,28 +277,28 @@ void DrawLogsWindow() {
                 i32 pathLen = (i32) strlen(settings.pathToAdb);
                 pathLen += (i32) strlen(" logcat *:S");
                 
-                for(int i = 0; i < tags.count; i++) {
-                    pathLen += (i32) strlen(tags[i].tag) + 3;
+                for(int i = 0; i < window_elements->tags.count; i++) {
+                    pathLen += (i32) strlen(window_elements->tags[i].tag) + 3;
                 }
                 
                 char* proc = (char*) malloc(pathLen + 1);
                 sprintf(proc, "%s logcat", settings.pathToAdb);
-                if(tags.count > 0) {
+                if(window_elements->tags.count > 0) {
                     strcat(proc, " *:S");
                 }
                 
-                for(int i = 0; i < tags.count; i++) {
+                for(int i = 0; i < window_elements->tags.count; i++) {
                     char buff[70];
-                    sprintf(buff, " %s:%c", tags[i].tag, PriorityToChar(tags[i].priority));
+                    sprintf(buff, " %s:%c", window_elements->tags[i].tag, PriorityToChar(window_elements->tags[i].priority));
                     
                     strcat(proc, buff);
                 }
                 
-                process = SpawnProcess(proc);
+                window_elements->process = SpawnProcess(proc);
                 free(proc);
             }
             
-            if(!process.isRunning) {
+            if(!window_elements->process.isRunning) {
                 ImGui::OpenPopup("Create Failed");
             }
             else {
@@ -329,7 +338,7 @@ void DrawLogsWindow() {
         ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
     }
     ImGui::PopItemWidth();
-    ImGui::Text("Count: %d", stb_sb_count(logs));
+    ImGui::Text("Count: %d", stb_sb_count(window_elements->logs));
     
     ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
@@ -351,12 +360,12 @@ void DrawLogsWindow() {
         ImGui::TableHeadersRow();
         
         ImGuiListClipper clipper;
-        clipper.Begin(stb_sb_count(logs));
+        clipper.Begin(stb_sb_count(window_elements->logs));
         
         while(clipper.Step())
             for (int logIndex = clipper.DisplayStart; logIndex < clipper.DisplayEnd; logIndex++)
         {
-            LogData* log = (logs + logIndex);
+            LogData* log = (window_elements->logs + logIndex);
             if(log->priority < priorityIndex) {
                 continue;
             }
@@ -442,6 +451,12 @@ int main()
     MTR_META_THREAD_NAME("main thread");
 #endif
     
+    //Initializing elements of main window
+    WindowElements main_window_elements;
+    main_window_elements.logs = NULL;
+    main_window_elements.process = {};
+
+
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -499,7 +514,7 @@ int main()
         
         MTR_BEGIN("main", "read adb out");
         char buffer[8192];
-        if(process.pinfo.hProcess && ReadProcessOut(&process, buffer)) {
+        if(main_window_elements.process.pinfo.hProcess && ReadProcessOut(&main_window_elements.process, buffer)) {
             static CL_Array<LogData> parsedLogs = {};
             
             MTR_BEGIN("main", "parsing");
@@ -508,7 +523,7 @@ int main()
             
             MTR_BEGIN("main", "logs push");
             for(int i = 0; i < parsedLogs.count; i++) {
-                stb_sb_push(logs, parsedLogs.data[i]);
+                stb_sb_push(main_window_elements.logs, parsedLogs.data[i]);
             }
             
             MTR_END("main", "logs push");
@@ -527,7 +542,7 @@ int main()
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
         
-        DrawLogsWindow();
+        DrawLogsWindow(&main_window_elements);
         
         if(showSettingsWindow)
             DrawSettingsMenu();
@@ -551,7 +566,7 @@ int main()
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     
-    CloseProcess(&process);
+    CloseProcess(&main_window_elements.process);
     
     glfwDestroyWindow(window);
     glfwTerminate();
