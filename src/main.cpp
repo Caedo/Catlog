@@ -18,14 +18,12 @@
 
 #include "parser.h"
 
+#include "types.h"
+
 bool show_demo_window = false;
 bool showSettingsWindow = false;
 
-
 Settings settings = {};
-
-
-
 
 
 char* LoadFileContent(const char* filePath) {
