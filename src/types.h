@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "platform_win32.h"
+
 typedef uint8_t u8;
 typedef int8_t  s8;
 
@@ -143,5 +145,9 @@ struct CL_Array {
     }
 };
 
-
+struct WindowElements{
+    LogData* logs;
+    ProcessData process;
+    CL_Array<TagPriorityPair> tags;
+};
 #endif //TYPES_H
