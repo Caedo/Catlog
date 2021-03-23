@@ -99,11 +99,11 @@ ProcessData SpawnProcess(char* path) {
     return pData;
 }
 
-bool ReadProcessOut(ProcessData* pData, char* buffer) {
+int ReadProcessOut(ProcessData* pData, char* buffer, int bufferSize) {
     static char errorBuffer[BUFFER_SIZE];
     
     if(pData->avaibleHandlesCount == 0) 
-        return false;
+        return 0;
     
     BOOL ok;
     
@@ -116,7 +116,7 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
             fprintf(stderr, "Error: %d", GetLastError());
         }
         
-        return false;
+        return 0;
     }
     
     DWORD index = wait - WAIT_OBJECT_0;
@@ -126,13 +126,14 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
         if (pData->outO.hEvent != NULL)
         {
             MTR_SCOPE("main", "Overlapped result");
-            DWORD r;
-            if (GetOverlappedResult(pData->childOutRead, &pData->outO, &r, TRUE))
+            DWORD readBytes;
+            if (GetOverlappedResult(pData->childOutRead, &pData->outO, &readBytes, TRUE))
             {
                 //printf("STDOUT received: %.*s\n", (int)r, buffer);
+                buffer[readBytes] = 0;
                 memset(&pData->outO, 0, sizeof(pData->outO));
                 
-                return true;
+                return readBytes + 1;
             }
             else
             {
@@ -144,17 +145,14 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
                 CloseHandle(pData->childOutRead);
                 CloseHandle(pData->outEvent);
                 
-                return false;
+                return 0;
             }
         }
         
-        MTR_BEGIN("main", "Memset");
-        memset(buffer, 0, 4096);
-        MTR_END("main", "Memset");
-        
         MTR_BEGIN("main", "Read File");
+        // we read size - 1 because we want null terminate given string
         pData->outO.hEvent = pData->outEvent;
-        ReadFile(pData->childOutRead, buffer, BUFFER_SIZE, NULL, &pData->outO);
+        ReadFile(pData->childOutRead, buffer, bufferSize - 1, NULL, &pData->outO);
         MTR_END("main", "Read File");
     }
     else if (h == pData->errEvent)
@@ -177,7 +175,7 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
                 CloseHandle(pData->childErrRead);
                 CloseHandle(pData->errEvent);
                 
-                return false;
+                return 0;
             }
         }
         
@@ -200,7 +198,7 @@ bool ReadProcessOut(ProcessData* pData, char* buffer) {
         fprintf(stderr, "exit code = %u\n", exitCode);
     }
     
-    return false;
+    return 0;
 }
 
 int CloseProcess(ProcessData* data) {

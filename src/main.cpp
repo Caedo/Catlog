@@ -20,6 +20,18 @@
 
 #include "types.h"
 
+
+struct TagPriorityPair {
+    char tag[64];
+    LogPriority priority;
+};
+
+struct WindowElements {
+    LogData* logs;
+    ProcessData process;
+    CLArray<TagPriorityPair> tags;
+};
+
 bool show_demo_window = false;
 bool showSettingsWindow = false;
 
@@ -137,7 +149,7 @@ void DrawMenuBar() {
 void DrawLogsWindow(WindowElements* windowElements) {
     
     static bool buffers[7] = {true, false, false, false, false, false, false};
-
+    
     ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
     ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
     
@@ -214,9 +226,9 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     ImGui::SetNextWindowSize(ImVec2(475, 200), ImGuiCond_Once);
     if(ImGui::BeginPopupModal("Logcat Parameters")) {
-
         
-
+        
+        
         ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
         ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
         {
@@ -240,7 +252,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
                         if (is_selected) {
                             ImGui::SetItemDefaultFocus();
                         }
-
+                        
                     }
                     ImGui::EndCombo();
                 }
@@ -270,7 +282,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
             if(settings.pathToAdb[0] != '\0')  {
                 i32 pathLen = (i32) strlen(settings.pathToAdb);
                 pathLen += (i32) strlen(" logcat *:S");
-
+                
                 //Reserving memory for buffer selection part of startup command
                 pathLen += (i32) strlen(" ");
                 if(buffers[1]) pathLen += (i32) strlen(" -b all ");
@@ -279,7 +291,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
                 if(buffers[4]) pathLen += (i32) strlen("-b main ");
                 if(buffers[5]) pathLen += (i32) strlen("-b system ");
                 if(buffers[6]) pathLen += (i32) strlen("-b crash ");
-
+                
                 int buf_status = 0;
                 for(int i=0; i<7; i++){
                     if(buf_status && buffers[i]) pathLen++;
@@ -302,7 +314,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
                     
                     strcat(proc, buff);
                 }
-
+                
                 //Just an indentation/scope block for buffer selection
                 {
                     char buff[70];
@@ -327,7 +339,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
                             strcat(proc, buff);
                         }
                         if(buffers[5]) {
-                        
+                            
                             sprintf(buff,"-b system "); 
                             strcat(proc, buff);
                         }
@@ -419,14 +431,14 @@ void DrawLogsWindow(WindowElements* windowElements) {
             }
             ImGui::PopItemWidth();
             ImGui::EndChild();   
-
+            
             ImGui::Separator();
             if(ImGui::Button("Close")) {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
         }
-
+        
         ImGui::SameLine();
         if(ImGui::Button("Close")) {
             ImGui::CloseCurrentPopup();
@@ -565,8 +577,8 @@ int main()
     mainWindowElements.logs = NULL;
     mainWindowElements.process = {};
     mainWindowElements.tags = {};
-
-
+    
+    
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -624,8 +636,8 @@ int main()
         
         MTR_BEGIN("main", "read adb out");
         char buffer[8192];
-        if(mainWindowElements.process.pinfo.hProcess && ReadProcessOut(&mainWindowElements.process, buffer)) {
-            static CL_Array<LogData> parsedLogs = {};
+        if(mainWindowElements.process.pinfo.hProcess && ReadProcessOut(&mainWindowElements.process, buffer, IM_ARRAYSIZE(buffer))) {
+            static CLArray<LogData> parsedLogs = {};
             
             MTR_BEGIN("main", "parsing");
             ParseMessage(buffer, &parsedLogs);

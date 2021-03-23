@@ -55,17 +55,19 @@ TestMessage messages[] = {
 };
 
 int main(int argc, char* argv[]) {
+    const int messagesPerBatch = 3;
     srand(time(NULL));
     
     int messagesCount = (int) sizeof(messages) / sizeof(*messages);
-    
     while(true) {
-        int index = rand() % messagesCount;
-        TestMessage log = messages[index];
+        for(int i = 0; i < messagesPerBatch; i++) {
+            int index = rand() % messagesCount;
+            TestMessage log = messages[index];
+            
+            printf("%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.month, log.date.day, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
+        }
         
-        printf("%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.month, log.date.day, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
         fflush(stdout);
-        
-        Sleep(5);
+        Sleep(50);
     }
 }

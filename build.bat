@@ -9,8 +9,15 @@ set linker_path="../lib/"
 
 if not exist build mkdir build
 pushd build
+
+REM Build With trace anabled
 REM start /b /wait "" "cl.exe" -DMTR_ENABLED %compile_flags% ../src/stub.cpp /link %linker_flags% /libpath:%linker_path% /out:%exe_name%.exe
+
 start /b /wait "" "cl.exe" %compile_flags% ../src/stub.cpp /link %linker_flags% /libpath:%linker_path% /out:%exe_name%.exe
+
+REM Generate file after precesor
+REM start /b /wait "" "cl.exe" %compile_flags% /P /C -DPREPROC_GEN ../src/stub.cpp
+
 copy ..\lib\* . >NUL
 copy ..\resources\* . >NUL
 popd

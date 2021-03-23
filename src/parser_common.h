@@ -71,6 +71,11 @@ inline void EatWhiteSpaces(Tokenizer* tokenizer) {
         tokenizer->position++;
 }
 
+inline void EatEndOfLine(Tokenizer* tokenizer) {
+    while(IsEndOfLine(*tokenizer->position))
+        tokenizer->position++;
+}
+
 i32 LineLength(char* str) {
     char* at = str;
     i32 len = 0;

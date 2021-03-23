@@ -1,6 +1,8 @@
 #include "parser.h"
 #include "settings.h"
 #include "parser_common.h"
+#include "CLArray.h"
+
 
 Token ADB_PeekNextToken(Tokenizer* tokenizer) {
     Token token = {};
@@ -101,7 +103,7 @@ LogPriority ParsePriority(Token token) {
 }
 
 
-void ParseMessage(char* message, CL_Array<LogData>* buffer) {
+void ParseMessage(char* message, CLArray<LogData>* buffer) {
     assert(message != NULL);
     
     buffer->Clear();
