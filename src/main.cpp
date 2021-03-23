@@ -27,9 +27,19 @@ struct TagPriorityPair {
 };
 
 struct WindowElements {
-    LogData* logs;
-    ProcessData process;
+    CLArray<LogData> logs;
+    CLArray<int> filteredLogIndices;
     CLArray<TagPriorityPair> tags;
+    
+    // Filter things
+	bool filtersActive;
+    ImGuiTextFilter tagFilter;
+    ImGuiTextFilter messageFilter;
+    int priorityIndex;
+    
+    
+    // TODO: change to opaque pointer or other cross-platform stuff
+    ProcessData process;
 };
 
 bool show_demo_window = false;
@@ -76,6 +86,12 @@ char PriorityToChar(LogPriority priority) {
     }
     
     return '?';
+}
+
+bool PassesWindowFilters(WindowElements* elements, LogData* log) {
+    return elements->tagFilter.PassFilter(log->tag) &&
+        elements->messageFilter.PassFilter(log->message) &&
+        log->priority >= elements->priorityIndex;
 }
 
 void DrawSettingsMenu() {
@@ -155,10 +171,6 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     ImGui::Begin("Logs");
     
-    static ImGuiTextFilter tagFilter;
-    static ImGuiTextFilter messageFilter;
-    static int priorityIndex;
-    
     if(windowElements->process.isRunning == false) {
         if(ImGui::Button("Start")) {
             if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
@@ -179,8 +191,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     ImGui::SameLine();
     if(ImGui::Button("Clear")) {
-        stb_sb_free(windowElements->logs);
-        windowElements->logs = NULL;
+        windowElements->logs.Free();
     }
     
     ImGui::Separator();
@@ -384,6 +395,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
         if(ImGui::Button("Select buffer")) {
             ImGui::OpenPopup("Buffer Selection");
         }
+        
         if(ImGui::BeginPopupModal("Buffer Selection", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
             
             ImGui::Text("Please select desired adb logcat buffers");
@@ -450,16 +462,50 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
     {
-        tagFilter.Draw("Tag Filter");
+        bool filtersEdited = false;
+        
+        windowElements->tagFilter.Draw("Tag Filter");
+        filtersEdited = filtersEdited || ImGui::IsItemEdited();
         
         ImGui::SameLine();
-        messageFilter.Draw("Message Filter");
+        windowElements->messageFilter.Draw("Message Filter");
+        filtersEdited = filtersEdited || ImGui::IsItemEdited();
         
         ImGui::SameLine();
-        ImGui::Combo("Priority", &priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+        ImGui::Combo("Priority", &windowElements->priorityIndex, LogPriorityName, IM_ARRAYSIZE(LogPriorityName));
+        filtersEdited = filtersEdited || ImGui::IsItemEdited();
+        
+        // NOTE: TODO:
+        // This can be slow when there will be a lot of elements
+        // should be profilled and changed if needed
+        if(filtersEdited) {
+            
+            windowElements->filtersActive = windowElements->tagFilter.IsActive() || windowElements->messageFilter.IsActive() || windowElements->priorityIndex > 0;
+            
+            if(windowElements->filtersActive) {
+                windowElements->filteredLogIndices.Clear();
+                
+                for(int i = 0; i < windowElements->logs.count; i++) {
+                    LogData* log = windowElements->logs.data + i;
+                    if(PassesWindowFilters(windowElements, log)) {
+                        windowElements->filteredLogIndices.Add(i);
+                    }
+                }
+            }
+        }
     }
     ImGui::PopItemWidth();
-    ImGui::Text("Count: %d", stb_sb_count(windowElements->logs));
+    
+    if(ImGui::Button("Clear filters")) {
+        windowElements->filteredLogIndices.Clear();
+        
+        windowElements->filtersActive = false;
+        windowElements->tagFilter.Clear();
+        windowElements->messageFilter.Clear();
+        windowElements->priorityIndex = 0;
+    }
+    
+    ImGui::Text("Count: %d", windowElements->logs.count);
     
     ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
@@ -480,24 +526,17 @@ void DrawLogsWindow(WindowElements* windowElements) {
         ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
         
+        bool filtersActive = windowElements->filtersActive;
+        int elementsCount = filtersActive ? windowElements->filteredLogIndices.count : windowElements->logs.count;
+        
         ImGuiListClipper clipper;
-        clipper.Begin(stb_sb_count(windowElements->logs));
+        clipper.Begin(elementsCount);
         
         while(clipper.Step())
             for (int logIndex = clipper.DisplayStart; logIndex < clipper.DisplayEnd; logIndex++)
         {
-            LogData* log = (windowElements->logs + logIndex);
-            if(log->priority < priorityIndex) {
-                continue;
-            }
-            
-            if (tagFilter.PassFilter(log->tag) == false) {
-                continue;
-            }
-            if (messageFilter.PassFilter(log->message) == false) {
-                continue;
-            }
-            
+            u32 index = filtersActive ? windowElements->filteredLogIndices[logIndex] : logIndex;
+            LogData* log = windowElements->logs.data + index;
             
             ImGui::TableNextRow();
             
@@ -572,12 +611,8 @@ int main()
     MTR_META_THREAD_NAME("main thread");
 #endif
     
-    //Initializing elements of main window
-    WindowElements mainWindowElements;
-    mainWindowElements.logs = NULL;
-    mainWindowElements.process = {};
-    mainWindowElements.tags = {};
-    
+    // TODO: Chagne this to array or smth so we can create multiple windows
+    WindowElements mainWindowElements = {};
     
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -645,7 +680,12 @@ int main()
             
             MTR_BEGIN("main", "logs push");
             for(int i = 0; i < parsedLogs.count; i++) {
-                stb_sb_push(mainWindowElements.logs, parsedLogs.data[i]);
+                // TODO: NOTE: Maybe just pass actual buffer without copying?
+                mainWindowElements.logs.Add(parsedLogs.data[i]);
+                
+                if(mainWindowElements.filtersActive && PassesWindowFilters(&mainWindowElements, &parsedLogs.data[i])) {
+                    mainWindowElements.filteredLogIndices.Add(mainWindowElements.logs.count - 1);
+                }
             }
             
             MTR_END("main", "logs push");
