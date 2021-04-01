@@ -150,7 +150,7 @@ int ReadProcessOut(ProcessData* pData, char* buffer, int bufferSize) {
         }
         
         MTR_BEGIN("main", "Read File");
-        // we read size - 1 because we want null terminate given string
+        // we read size - 1 because we want to null terminate given string
         pData->outO.hEvent = pData->outEvent;
         ReadFile(pData->childOutRead, buffer, bufferSize - 1, NULL, &pData->outO);
         MTR_END("main", "Read File");

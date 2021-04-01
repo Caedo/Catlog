@@ -20,19 +20,24 @@
 
 #include "types.h"
 
-
 struct TagPriorityPair {
     char tag[64];
     LogPriority priority;
 };
 
 struct WindowElements {
+    // ImGui stuff
+    int id;
+    char label[128];
+    bool isOpen;
+    
+    // Logs
     CLArray<LogData> logs;
     CLArray<int> filteredLogIndices;
     CLArray<TagPriorityPair> tags;
     
     // Filter things
-	bool filtersActive;
+    bool filtersActive;
     ImGuiTextFilter tagFilter;
     ImGuiTextFilter messageFilter;
     int priorityIndex;
@@ -47,6 +52,28 @@ bool showSettingsWindow = false;
 
 Settings settings = {};
 
+// NOTE: TODO: Do we really need dynamic array here...?
+CLArray<WindowElements> windowsData = {};
+
+void OpenNewWindow() {
+    static int nextWindowId = 0;
+    
+    windowsData.AddEmpty();
+    WindowElements* window = windowsData.data + windowsData.count - 1;
+    
+    window->id = nextWindowId++;
+    window->isOpen = true;
+    
+    snprintf(window->label, IM_ARRAYSIZE(window->label), "Logs###%d", window->id);
+}
+
+void ClearWindow(WindowElements* window) {
+    CloseProcess(&window->process);
+    
+    window->logs.Free();
+    window->filteredLogIndices.Free();
+    window->tags.Free();
+}
 
 char* LoadFileContent(const char* filePath) {
     char* ret = NULL;
@@ -149,6 +176,13 @@ void DrawMenuBar() {
             ImGui::EndMenu();
         }
         
+        if(ImGui::BeginMenu("Window")) {
+            if(ImGui::MenuItem("New Window")) {
+                OpenNewWindow();
+            }
+            ImGui::EndMenu();
+        }
+        
         
         if(ImGui::BeginMenu("Help")) {
             if(ImGui::MenuItem("Show/Hide ImGui help")) {
@@ -166,10 +200,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     static bool buffers[7] = {true, false, false, false, false, false, false};
     
-    ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
-    ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_FirstUseEver);
-    
-    ImGui::Begin("Logs");
+    ImGui::Begin(windowElements->label, &windowElements->isOpen);
     
     if(windowElements->process.isRunning == false) {
         if(ImGui::Button("Start")) {
@@ -611,8 +642,7 @@ int main()
     MTR_META_THREAD_NAME("main thread");
 #endif
     
-    // TODO: Chagne this to array or smth so we can create multiple windows
-    WindowElements mainWindowElements = {};
+    OpenNewWindow();
     
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -669,29 +699,6 @@ int main()
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
         
-        MTR_BEGIN("main", "read adb out");
-        char buffer[8192];
-        if(mainWindowElements.process.pinfo.hProcess && ReadProcessOut(&mainWindowElements.process, buffer, IM_ARRAYSIZE(buffer))) {
-            static CLArray<LogData> parsedLogs = {};
-            
-            MTR_BEGIN("main", "parsing");
-            ParseMessage(buffer, &parsedLogs);
-            MTR_END("main", "parsing");
-            
-            MTR_BEGIN("main", "logs push");
-            for(int i = 0; i < parsedLogs.count; i++) {
-                // TODO: NOTE: Maybe just pass actual buffer without copying?
-                mainWindowElements.logs.Add(parsedLogs.data[i]);
-                
-                if(mainWindowElements.filtersActive && PassesWindowFilters(&mainWindowElements, &parsedLogs.data[i])) {
-                    mainWindowElements.filteredLogIndices.Add(mainWindowElements.logs.count - 1);
-                }
-            }
-            
-            MTR_END("main", "logs push");
-        }
-        MTR_END("main", "read adb out");
-        
         MTR_BEGIN("main", "render");
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -704,7 +711,47 @@ int main()
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
         
-        DrawLogsWindow(&mainWindowElements);
+        ImGuiID dockspaceID = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+        
+        for(int i = 0; i < windowsData.count; i++) {
+            WindowElements* windowData = windowsData.data + i;
+            
+            MTR_BEGIN("main", "read adb out");
+            char buffer[8192];
+            if(windowData->process.pinfo.hProcess && ReadProcessOut(&windowData->process, buffer, IM_ARRAYSIZE(buffer))) {
+                static CLArray<LogData> parsedLogs = {};
+                
+                MTR_BEGIN("main", "parsing");
+                ParseMessage(buffer, &parsedLogs);
+                MTR_END("main", "parsing");
+                
+                MTR_BEGIN("main", "logs push");
+                for(int j = 0; j < parsedLogs.count; j++) {
+                    // TODO: NOTE: Maybe just pass actual buffer without copying?
+                    windowData->logs.Add(parsedLogs.data[j]);
+                    
+                    if(windowData->filtersActive && PassesWindowFilters(windowData, &parsedLogs.data[j])) {
+                        windowData->filteredLogIndices.Add(windowData->logs.count - 1);
+                    }
+                }
+                
+                MTR_END("main", "logs push");
+            }
+            MTR_END("main", "read adb out");
+            
+            ImGui::SetNextWindowDockID(dockspaceID , ImGuiCond_Once);
+            DrawLogsWindow(windowData);
+        }
+        
+        
+        for(int i = windowsData.count - 1; i >= 0; i--) {
+            WindowElements* windowData = windowsData.data + i;
+            
+            if(windowData->isOpen == false) {
+                ClearWindow(windowData);
+                windowsData.RemoveAt(i);
+            }
+        }
         
         if(showSettingsWindow)
             DrawSettingsMenu();
@@ -728,7 +775,9 @@ int main()
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     
-    CloseProcess(&mainWindowElements.process);
+    for(int i = 0; i < windowsData.count; i++) {
+        CloseProcess(&windowsData[i].process);
+    }
     
     glfwDestroyWindow(window);
     glfwTerminate();

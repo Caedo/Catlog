@@ -44,7 +44,7 @@ struct CLArray {
             Resize(count + 1);
         }
         
-        data[count] = {};
+        memset(&data[count], 0, sizeof(T));
         count++;
     }
     
