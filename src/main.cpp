@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <fstream>
 
 #include "stretchy_buffer.h"
 
@@ -167,7 +168,35 @@ void DrawMenuBar() {
     if(ImGui::BeginMainMenuBar()) {
         if(ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New")) {}
-            if (ImGui::MenuItem("Open", "Ctrl+O")) {}
+            if (ImGui::MenuItem("Open", "Ctrl+O")) {
+                char* buffer;
+                char path[100];
+                OpenFileDialog(path,100);
+                if (path[0] != 0) {
+                    WindowElements* windowElements = windowsData.data;
+                    windowElements->logs.Free();
+                    buffer = LoadFileContent(path);
+                    static CLArray<LogData> parsedLogs = {};
+                    ParseMessage(buffer, &parsedLogs);
+                    free(buffer);
+                    for (int i = 0; i < parsedLogs.count; i++) {
+                        windowElements->logs.Add(parsedLogs.data[i]);
+                    }
+                }
+            }
+            if (ImGui::MenuItem("Save")) {
+                char path[100];
+                OpenFileDialog(path,100);
+                if(path[0] != 0) {
+                    std::fstream file(path, std::ios::out);
+                    WindowElements *windowElements = windowsData.data;
+                    for (int i = 0; i < windowElements->logs.count; i++) {
+                        LogData *log = windowElements->logs.data + i;
+                        file << log->rawString << '\n';
+                    }
+                }
+                
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("Settings")) {
                 showSettingsWindow = !showSettingsWindow;
