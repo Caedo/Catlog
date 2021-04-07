@@ -233,124 +233,11 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     if(windowElements->process.isRunning == false) {
         if(ImGui::Button("Start")) {
-            if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
-                ImGui::OpenPopup("Logcat Parameters");
-            }
-            else {
+            if(settings.pathToAdb == NULL || settings.pathToAdb[0] == 0) {
                 ImGui::OpenPopup("Set ADB Path");
             }
-        }
-    }
-    else {
-        if(ImGui::Button("Stop")) {
-            if(windowElements->process.pinfo.hProcess) {
-                CloseProcess(&windowElements->process);
-            }
-        }
-    }
-    
-    ImGui::SameLine();
-    if(ImGui::Button("Clear")) {
-        windowElements->logs.Free();
-    }
-    
-    ImGui::Separator();
-    
-    
-    bool shouldOpenPopup = false;
-    ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Once);
-    if(ImGui::BeginPopupModal("Set ADB Path")) {
-        ImGui::BeginChild("Please, set the path :>", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
-        
-        ImGui::Text("Please set path to your adb installation.");
-        ImGui::Text("Path to ADB: %s", settings.pathToAdb);
-        
-        if(ImGui::Button("Browse...")) {
-            OpenFileDialog(settings.pathToAdb, 1024);
-        }
-        
-        ImGui::EndChild();
-        
-        ImGui::Separator();
-        if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
-            if(ImGui::Button("Save and Continue")) {
-                SaveSettings(&settings);
+            else {
                 
-                ImGui::CloseCurrentPopup();
-                shouldOpenPopup = true;
-            }
-            
-            ImGui::SameLine();
-        }
-        
-        
-        if(ImGui::Button("Close")) {
-            ImGui::CloseCurrentPopup();
-        }
-        
-        ImGui::EndPopup();
-    }
-    
-    if(shouldOpenPopup) {
-        ImGui::OpenPopup("Logcat Parameters");
-    }
-    
-    ImGui::SetNextWindowSize(ImVec2(475, 200), ImGuiCond_Once);
-    if(ImGui::BeginPopupModal("Logcat Parameters")) {
-        
-        
-        
-        ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
-        ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
-        {
-            for(int i = 0; i < windowElements->tags.count; i++) {
-                ImGui::PushID(i);
-                
-                ImGui::InputText("Tag", windowElements->tags.data[i].tag, 64);
-                ImGui::SameLine();
-                
-                if (ImGui::BeginCombo("Priority", LogPriorityName[(int)(windowElements->tags.data[i].priority) ]))
-                {
-                    // we want to skip "None" priority
-                    for (int n = 1; n < IM_ARRAYSIZE(LogPriorityName); n++)
-                    {
-                        const bool is_selected = ((int) (windowElements->tags.data[n].priority == n));
-                        if (ImGui::Selectable(LogPriorityName[n], is_selected)) {
-                            windowElements->tags.data[i].priority = (LogPriority) n;
-                        }
-                        
-                        // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                        if (is_selected) {
-                            ImGui::SetItemDefaultFocus();
-                        }
-                        
-                    }
-                    ImGui::EndCombo();
-                }
-                
-                ImGui::SameLine();
-                if(ImGui::Button("X")) {
-                    windowElements->tags.RemoveAt(i);
-                }
-                
-                ImGui::PopID();
-            }
-        }
-        ImGui::PopItemWidth();
-        
-        if(ImGui::Button("Add tag")) {
-            TagPriorityPair newPair = {};
-            newPair.priority = Verbose;
-            
-            windowElements->tags.Add(newPair);
-        }
-        
-        ImGui::EndChild();
-        
-        
-        ImGui::Separator();
-        if(ImGui::Button("Start")) {
-            if(settings.pathToAdb[0] != '\0')  {
                 i32 pathLen = (i32) strlen(settings.pathToAdb);
                 pathLen += (i32) strlen(" logcat *:S");
                 
@@ -395,7 +282,8 @@ void DrawLogsWindow(WindowElements* windowElements) {
                     if(buffers[1]) {
                         sprintf(buff,"-b all ");
                         strcat(proc, buff);
-                    }else{
+                    }
+                    else {
                         //As the documentation seems invalid, all buffers habve to be preceeded by -b
                         if(buffers[2]) {
                             sprintf(buff,"-b radio "); 
@@ -427,92 +315,187 @@ void DrawLogsWindow(WindowElements* windowElements) {
                 
                 windowElements->process = SpawnProcess(proc);
                 free(proc);
-            }
-            
-            if(!windowElements->process.isRunning) {
-                ImGui::OpenPopup("Create Failed");
-            }
-            else {
-                ImGui::CloseCurrentPopup();
-            }
-        }
-        
-        if(ImGui::BeginPopupModal("Create Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            
-            ImGui::Text("Failed to create ADB process!");
-            ImGui::Text("Please make sure that your path to ADB executable is correct.");
-            
-            ImGui::Separator();
-            if(ImGui::Button("Close")) {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-        }
-        
-        
-        //Popup allowing user to select desired source buffers of logs
-        ImGui::SameLine();
-        if(ImGui::Button("Select buffer")) {
-            ImGui::OpenPopup("Buffer Selection");
-        }
-        
-        if(ImGui::BeginPopupModal("Buffer Selection", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            
-            ImGui::Text("Please select desired adb logcat buffers");
-            ImGui::BeginChild("Buffers", ImVec2(0, 140)); 
-            ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
-            {
-                ImGui::Separator();
-                if(ImGui::Selectable("Default", &buffers[0]) && buffers[0] == true){
-                    buffers[1] = false;
-                    buffers[2] = false;
-                    buffers[3] = false;
-                    buffers[4] = false;
-                    buffers[5] = false;
-                    buffers[6] = false;
+                
+                
+                if(!windowElements->process.isRunning) {
+                    ImGui::OpenPopup("Create Failed");
                 }
-                if(ImGui::Selectable("All", &buffers[1]) && buffers[1] == true){
-                    buffers[0] = false;
-                    buffers[2] = false;
-                    buffers[3] = false;
-                    buffers[4] = false;
-                    buffers[5] = false;
-                    buffers[6] = false;
-                }
-                ImGui::Separator();
-                if(ImGui::Selectable("Radio", &buffers[2]) && buffers[2] == true){
-                    buffers[0] = false;
-                    buffers[1] = false;
-                } 
-                if(ImGui::Selectable("Events", &buffers[3]) && buffers[3] == true){
-                    buffers[0] = false;
-                    buffers[1] = false;
-                }; 
-                if(ImGui::Selectable("Main", &buffers[4]) && buffers[4] == true){
-                    buffers[0] = false;
-                    buffers[1] = false;
-                }; 
-                if(ImGui::Selectable("System", &buffers[5]) && buffers[5] == true){
-                    buffers[0] = false;
-                    buffers[1] = false;
-                }; 
-                if(ImGui::Selectable("Crash", &buffers[6]) && buffers[6] == true){
-                    buffers[0] = false;
-                    buffers[1] = false;
-                }; 
             }
-            ImGui::PopItemWidth();
-            ImGui::EndChild();   
-            
-            ImGui::Separator();
-            if(ImGui::Button("Close")) {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
         }
+    }
+    else {
+        if(ImGui::Button("Stop")) {
+            if(windowElements->process.pinfo.hProcess) {
+                CloseProcess(&windowElements->process);
+            }
+        }
+    }
+    
+    ImGui::SameLine();
+    if(ImGui::Button("Clear")) {
+        windowElements->logs.Free();
+    }
+    
+    ImGui::SameLine();
+    if(ImGui::Button("Settings")) {
+        ImGui::OpenPopup("Logcat Parameters");
+    }
+    
+    ImGui::Separator();
+    
+    
+    if(ImGui::BeginPopupModal("Create Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Failed to create ADB process!");
+        ImGui::Text("Please make sure that your path to ADB executable is correct.");
         
-        ImGui::SameLine();
+        ImGui::Separator();
         if(ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    
+    ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Once);
+    if(ImGui::BeginPopupModal("Set ADB Path")) {
+        ImGui::BeginChild("Please, set the path :>", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
+        
+        ImGui::Text("Please set path to your adb installation.");
+        ImGui::Text("Path to ADB: %s", settings.pathToAdb);
+        
+        if(ImGui::Button("Browse...")) {
+            OpenFileDialog(settings.pathToAdb, 1024);
+        }
+        
+        ImGui::EndChild();
+        
+        ImGui::Separator();
+        if(settings.pathToAdb && settings.pathToAdb[0] != 0) {
+            if(ImGui::Button("Save and Continue")) {
+                SaveSettings(&settings);
+                
+                ImGui::CloseCurrentPopup();
+            }
+            
+            ImGui::SameLine();
+        }
+        
+        
+        if(ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::EndPopup();
+    }
+    
+    ImGui::SetNextWindowSize(ImVec2(475, 200), ImGuiCond_Once);
+    if(ImGui::BeginPopupModal("Logcat Parameters")) {
+        
+        ImGui::BeginChild("Tabs", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
+        if(ImGui::BeginTabBar("Logcat Params Tab")) {
+            if(ImGui::BeginTabItem("Tags")) {
+                ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
+                {
+                    for(int i = 0; i < windowElements->tags.count; i++) {
+                        ImGui::PushID(i);
+                        
+                        ImGui::InputText("Tag", windowElements->tags.data[i].tag, 64);
+                        ImGui::SameLine();
+                        
+                        if (ImGui::BeginCombo("Priority", LogPriorityName[(int)(windowElements->tags.data[i].priority) ]))
+                        {
+                            // we want to skip "None" priority
+                            for (int n = 1; n < IM_ARRAYSIZE(LogPriorityName); n++)
+                            {
+                                const bool is_selected = ((int) (windowElements->tags.data[n].priority == n));
+                                if (ImGui::Selectable(LogPriorityName[n], is_selected)) {
+                                    windowElements->tags.data[i].priority = (LogPriority) n;
+                                }
+                                
+                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                                if (is_selected) {
+                                    ImGui::SetItemDefaultFocus();
+                                }
+                                
+                            }
+                            ImGui::EndCombo();
+                        }
+                        
+                        ImGui::SameLine();
+                        if(ImGui::Button("X")) {
+                            windowElements->tags.RemoveAt(i);
+                        }
+                        
+                        ImGui::PopID();
+                    }
+                }
+                ImGui::PopItemWidth();
+                
+                if(ImGui::Button("Add tag")) {
+                    TagPriorityPair newPair = {};
+                    newPair.priority = Verbose;
+                    
+                    windowElements->tags.Add(newPair);
+                }
+                
+                ImGui::EndTabItem();
+            }
+            
+            if(ImGui::BeginTabItem("Buffers")) {
+                
+                ImGui::Text("Please select desired adb logcat buffers");
+                ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
+                {
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Default", &buffers[0]) && buffers[0] == true){
+                        buffers[1] = false;
+                        buffers[2] = false;
+                        buffers[3] = false;
+                        buffers[4] = false;
+                        buffers[5] = false;
+                        buffers[6] = false;
+                    }
+                    if(ImGui::Selectable("All", &buffers[1]) && buffers[1] == true){
+                        buffers[0] = false;
+                        buffers[2] = false;
+                        buffers[3] = false;
+                        buffers[4] = false;
+                        buffers[5] = false;
+                        buffers[6] = false;
+                    }
+                    ImGui::Separator();
+                    if(ImGui::Selectable("Radio", &buffers[2]) && buffers[2] == true){
+                        buffers[0] = false;
+                        buffers[1] = false;
+                    } 
+                    if(ImGui::Selectable("Events", &buffers[3]) && buffers[3] == true){
+                        buffers[0] = false;
+                        buffers[1] = false;
+                    }; 
+                    if(ImGui::Selectable("Main", &buffers[4]) && buffers[4] == true){
+                        buffers[0] = false;
+                        buffers[1] = false;
+                    }; 
+                    if(ImGui::Selectable("System", &buffers[5]) && buffers[5] == true){
+                        buffers[0] = false;
+                        buffers[1] = false;
+                    }; 
+                    if(ImGui::Selectable("Crash", &buffers[6]) && buffers[6] == true){
+                        buffers[0] = false;
+                        buffers[1] = false;
+                    }; 
+                }
+                ImGui::PopItemWidth();
+                
+                ImGui::EndTabItem();
+            }
+            
+            ImGui::EndTabBar();
+        }
+        
+        ImGui::EndChild();
+        ImGui::Separator();
+        
+        if(ImGui::Button("Ok")) {
             ImGui::CloseCurrentPopup();
         }
         
@@ -641,7 +624,6 @@ void DrawLogsWindow(WindowElements* windowElements) {
                     ImGui::BeginTooltip();
                     
                     ImGui::PushTextWrapPos(columnSize);
-                    ImGui::Text("Column: %.3f  Text: %.3f", columnSize, textSize);
                     ImGui::TextWrapped(log->message);
                     ImGui::PopTextWrapPos();
                     
