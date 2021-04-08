@@ -1,9 +1,27 @@
+#ifndef PREPROC_GEN
+
 #include <stdio.h>
 #include <fstream>
 
-#include "stretchy_buffer.h"
+#ifdef MTR_ENABLED
+#include "Minitrace/minitrace.h"
+#include "Minitrace/minitrace.c"
+#else
+#define MTR_BEGIN
+#define MTR_END
+#define MTR_SCOPE
+#endif // MTR_ENABLED
 
-#include "platform_win32.h"
+#include "glad.c"
+
+#include "ImGUI/imgui.cpp"
+#include "ImGUI/imgui_draw.cpp"
+#include "ImGUI/imgui_tables.cpp"
+#include "ImGUI/imgui_widgets.cpp"
+#include "ImGUI/imgui_impl_glfw.cpp"
+#include "ImGUI/imgui_impl_opengl3.cpp"
+
+#include "ImGUI/imgui_demo.cpp"
 
 #define GLFW_DLL
 #define GLFW_INCLUDE_NONE
@@ -11,15 +29,19 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "ImGUI/imgui.h"
-#include "ImGUI/imgui_impl_glfw.h"
-#include "ImGUI/imgui_impl_opengl3.h"
+#endif //PREPROC_GEN
 
+#include "common.h"
+#include "CLArray.h"
+
+#include "parser_common.h"
+#include "platform_win32.h"
 #include "settings.h"
 
-#include "parser.h"
+#include "logcat_parser.cpp"
+#include "platform_win32.cpp"
+#include "settings.cpp"
 
-#include "types.h"
 
 struct TagPriorityPair {
     char tag[64];

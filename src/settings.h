@@ -11,6 +11,4 @@ struct Settings {
     ImVec4 errorColor;
 };
 
-void ParseSettingsFile(Settings* settings, char* fileContent);
-
 #endif //SETTINGS_H

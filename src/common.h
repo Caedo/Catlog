@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "platform_win32.h"
-
 typedef uint8_t u8;
 typedef int8_t  s8;
 

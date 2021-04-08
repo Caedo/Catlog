@@ -1,5 +1,3 @@
-#include "platform_win32.h"
-#include "types.h"
 
 static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
 {

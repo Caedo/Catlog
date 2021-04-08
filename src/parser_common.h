@@ -1,9 +1,6 @@
 #ifndef PARSER_COMMON_H
 #define PARSER_COMMON_H
 
-#include "types.h"
-
-
 enum Token_Type {
     Token_Unknown,
     

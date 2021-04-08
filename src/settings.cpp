@@ -1,6 +1,6 @@
-#include "parser_common.h"
 
 char* LoadFileContent(const char* filePath);
+void ParseSettingsFile(Settings* settings, char* fileContent);
 
 Settings DefautSettings() {
     Settings settings = {};

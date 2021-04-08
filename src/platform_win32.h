@@ -24,8 +24,4 @@ struct ProcessData {
     HANDLE childErrRead;
 };
 
-ProcessData SpawnProcess(char* path);
-char* ReadProcessOut(ProcessData* pData);
-int CloseProcess(ProcessData* pData);
-
 #endif //PLATFORM_WIN32_H
