@@ -214,24 +214,95 @@ int CloseProcess(ProcessData* data) {
     return 0;
 }
 
-bool OpenFileDialog(char* pathBuffer, i32 maxPath) {
+bool OpenFileDialog(CLStr* path, CLStr* fileName = nullptr) {
+    assert(path);
+    
     OPENFILENAME ofn = {};       // common dialog box structure
     
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = NULL; // TODO: Add GLFW window handle
-    ofn.lpstrFile = pathBuffer;
+    ofn.lpstrFile = (LPSTR) path->str;
+    
     // Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
     // use the contents of szFile to initialize itself.
     ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = maxPath;
-    ofn.lpstrFilter = "All\0*.*\0Text\0*.TXT\0";
+    
+    // NOTE(Coedo) WinApi uses 32 bit value for max path size
+    ofn.nMaxFile = (DWORD) path->capacity; 
+    ofn.lpstrFilter = "All\0*.*\0";
     ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
-    ofn.nMaxFileTitle = 0;
+    
+    if(fileName != nullptr) {
+        ofn.lpstrFileTitle = (LPSTR) fileName->str;
+        ofn.nMaxFileTitle = (DWORD) fileName->capacity;
+    }
+    
     ofn.lpstrInitialDir = NULL;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
     
     // Display the Open dialog box. 
+    BOOL result = GetOpenFileName(&ofn);
+    if(result) {
+        path->length = (u64) strlen((char*) path->str);
+        
+        if(fileName) {
+            fileName->length = (u64) strlen((char*) fileName->str);
+        }
+    }
     
-    return GetOpenFileName(&ofn) == TRUE;
+    return result;
+}
+
+bool OpenFileDialog(char* path, u32 pathBufferSize) {
+    assert(path);
+    
+    CLStr pathStr = StrMakeBuffer(path, pathBufferSize);
+    return OpenFileDialog(&pathStr);
+}
+
+
+bool SaveFileDialog(CLStr* path, CLStr* fileName = nullptr) {
+    assert(path);
+    
+    OPENFILENAME ofn = {};       // common dialog box structure
+    
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = NULL; // TODO: Add GLFW window handle
+    ofn.lpstrFile = (LPSTR) path->str;
+    
+    // Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
+    // use the contents of szFile to initialize itself.
+    ofn.lpstrFile[0] = '\0';
+    
+    // NOTE(Coedo) WinApi uses 32 bit value for max path size
+    ofn.nMaxFile = (DWORD) path->capacity; 
+    ofn.lpstrFilter = "All\0*.*\0";
+    ofn.nFilterIndex = 1;
+    
+    if(fileName != nullptr) {
+        ofn.lpstrFileTitle = (LPSTR) fileName->str;
+        ofn.nMaxFileTitle = (DWORD) fileName->capacity;
+    }
+    
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT;
+    
+    // Display the Open dialog box. 
+    BOOL result = GetSaveFileName(&ofn);
+    if(result) {
+        path->length = (u64) strlen((char*) path->str);
+        
+        if(fileName) {
+            fileName->length = (u64) strlen((char*) fileName->str);
+        }
+    }
+    
+    return result;
+}
+
+bool SaveFileDialog(char* path, u32 pathBufferSize) {
+    assert(path);
+    
+    CLStr pathStr = StrMakeBuffer(path, pathBufferSize);
+    return SaveFileDialog(&pathStr);
 }

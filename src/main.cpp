@@ -33,6 +33,7 @@
 
 #include "common.h"
 #include "CLArray.h"
+#include "CLstr.h"
 
 #include "parser_common.h"
 #include "platform_win32.h"
@@ -54,6 +55,9 @@ struct WindowElements {
     char label[128];
     bool isOpen;
     
+    bool isOpennedWithFile;
+    char deviceId[128];
+    
     // Logs
     CLArray<LogData> logs;
     CLArray<int> filteredLogIndices;
@@ -64,7 +68,6 @@ struct WindowElements {
     ImGuiTextFilter tagFilter;
     ImGuiTextFilter messageFilter;
     int priorityIndex;
-    
     
     // TODO: change to opaque pointer or other cross-platform stuff
     ProcessData process;
@@ -155,7 +158,7 @@ void DrawSettingsMenu() {
             
             ImGui::SameLine();
             if(ImGui::Button("Browse...")) {
-                OpenFileDialog(settings.pathToAdb, 1024);
+                OpenFileDialog(settings.pathToAdb, IM_ARRAYSIZE(settings.pathToAdb));
             }
             
             ImGui::EndTabItem();
@@ -191,24 +194,38 @@ void DrawMenuBar() {
         if(ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New")) {}
             if (ImGui::MenuItem("Open", "Ctrl+O")) {
-                char* buffer;
-                char path[100];
-                OpenFileDialog(path,100);
+                
+                char path[1024];
+                CLStr pathStr = StrMakeBuffer(path, IM_ARRAYSIZE(path));
+                
+                char fileName[256];
+                CLStr fileNameStr = StrMakeBuffer(fileName, IM_ARRAYSIZE(fileName));
+                
+                OpenFileDialog(&pathStr, &fileNameStr);
+                
                 if (path[0] != 0) {
                     WindowElements* windowElements = windowsData.data;
                     windowElements->logs.Free();
-                    buffer = LoadFileContent(path);
+                    
+                    char* buffer = LoadFileContent(path);
                     static CLArray<LogData> parsedLogs = {};
                     ParseMessage(buffer, &parsedLogs);
                     free(buffer);
+                    
                     for (int i = 0; i < parsedLogs.count; i++) {
                         windowElements->logs.Add(parsedLogs.data[i]);
                     }
+                    
+                    windowElements->isOpennedWithFile = true;
+                    snprintf(windowElements->label, IM_ARRAYSIZE(windowElements->label), "%s###%d", fileName, windowElements->id); 
                 }
             }
             if (ImGui::MenuItem("Save")) {
-                char path[100];
-                OpenFileDialog(path,100);
+                char path[1024];
+                CLStr pathStr = StrMakeBuffer(path, IM_ARRAYSIZE(path));
+                
+                SaveFileDialog(&pathStr);
+                
                 if(path[0] != 0) {
                     std::fstream file(path, std::ios::out);
                     WindowElements *windowElements = windowsData.data;
@@ -253,118 +270,114 @@ void DrawLogsWindow(WindowElements* windowElements) {
     
     ImGui::Begin(windowElements->label, &windowElements->isOpen);
     
-    if(windowElements->process.isRunning == false) {
-        if(ImGui::Button("Start")) {
-            if(settings.pathToAdb == NULL || settings.pathToAdb[0] == 0) {
-                ImGui::OpenPopup("Set ADB Path");
-            }
-            else {
-                
-                i32 pathLen = (i32) strlen(settings.pathToAdb);
-                pathLen += (i32) strlen(" logcat *:S");
-                
-                //Reserving memory for buffer selection part of startup command
-                pathLen += (i32) strlen(" ");
-                if(buffers[1]) pathLen += (i32) strlen(" -b all ");
-                if(buffers[2]) pathLen += (i32) strlen("-b radio ");
-                if(buffers[3]) pathLen += (i32) strlen("-b events ");
-                if(buffers[4]) pathLen += (i32) strlen("-b main ");
-                if(buffers[5]) pathLen += (i32) strlen("-b system ");
-                if(buffers[6]) pathLen += (i32) strlen("-b crash ");
-                
-                int buf_status = 0;
-                for(int i=0; i<7; i++){
-                    if(buf_status && buffers[i]) pathLen++;
-                    if(buffers[i]) buf_status++;
+    if(windowElements->isOpennedWithFile == false) {
+        if(windowElements->process.isRunning == false) {
+            if(ImGui::Button("Start")) {
+                if(settings.pathToAdb == NULL || settings.pathToAdb[0] == 0) {
+                    ImGui::OpenPopup("Set ADB Path");
                 }
-                
-                for(int i = 0; i < windowElements->tags.count; i++) {
-                    pathLen += (i32) strlen(windowElements->tags[i].tag) + 3;
-                }
-                
-                char* proc = (char*) malloc(pathLen + 1);
-                sprintf(proc, "%s logcat", settings.pathToAdb);
-                if(windowElements->tags.count > 0) {
-                    strcat(proc, " *:S");
-                }
-                
-                for(int i = 0; i < windowElements->tags.count; i++) {
-                    char buff[70];
-                    sprintf(buff, " %s:%c", windowElements->tags[i].tag, PriorityToChar(windowElements->tags[i].priority));
+                else {
                     
-                    strcat(proc, buff);
-                }
-                
-                //Just an indentation/scope block for buffer selection
-                {
-                    char buff[70];
-                    //Default flag is set by default. Setting any other will disable it
-                    strcat(proc, " ");
-                    //All flag blocks all the other flags from reappearing
-                    if(buffers[1]) {
-                        sprintf(buff,"-b all ");
+                    i32 pathLen = (i32) strlen(settings.pathToAdb);
+                    pathLen += (i32) strlen(" logcat *:S");
+                    
+                    //Reserving memory for buffer selection part of startup command
+                    pathLen += (i32) strlen(" ");
+                    if(buffers[1]) pathLen += (i32) strlen(" -b all ");
+                    if(buffers[2]) pathLen += (i32) strlen("-b radio ");
+                    if(buffers[3]) pathLen += (i32) strlen("-b events ");
+                    if(buffers[4]) pathLen += (i32) strlen("-b main ");
+                    if(buffers[5]) pathLen += (i32) strlen("-b system ");
+                    if(buffers[6]) pathLen += (i32) strlen("-b crash ");
+                    
+                    int buf_status = 0;
+                    for(int i=0; i<7; i++){
+                        if(buf_status && buffers[i]) pathLen++;
+                        if(buffers[i]) buf_status++;
+                    }
+                    
+                    for(int i = 0; i < windowElements->tags.count; i++) {
+                        pathLen += (i32) strlen(windowElements->tags[i].tag) + 3;
+                    }
+                    
+                    char* proc = (char*) malloc(pathLen + 1);
+                    sprintf(proc, "%s logcat", settings.pathToAdb);
+                    if(windowElements->tags.count > 0) {
+                        strcat(proc, " *:S");
+                    }
+                    
+                    for(int i = 0; i < windowElements->tags.count; i++) {
+                        char buff[70];
+                        sprintf(buff, " %s:%c", windowElements->tags[i].tag, PriorityToChar(windowElements->tags[i].priority));
+                        
                         strcat(proc, buff);
                     }
-                    else {
-                        //As the documentation seems invalid, all buffers habve to be preceeded by -b
-                        if(buffers[2]) {
-                            sprintf(buff,"-b radio "); 
-                            strcat(proc, buff);
-                        }
-                        if(buffers[3]) {
-                            sprintf(buff,"-b events ");
-                            strcat(proc, buff);
-                        }
-                        if(buffers[4]) {
-                            sprintf(buff,"-b main "); 
-                            strcat(proc, buff);
-                        }
-                        if(buffers[5]) {
-                            
-                            sprintf(buff,"-b system "); 
-                            strcat(proc, buff);
-                        }
-                        if(buffers[6]) {
-                            sprintf(buff,"-b crash ");
-                            strcat(proc, buff);
-                        }
-                    }
                     
-                }
-                //Drawing startup command into console, to make debugging easier
-                //TODO: Remove this
-                printf("%s\n", proc);
-                
-                windowElements->process = SpawnProcess(proc);
-                free(proc);
-                
-                
-                if(!windowElements->process.isRunning) {
-                    ImGui::OpenPopup("Create Failed");
+                    //Just an indentation/scope block for buffer selection
+                    {
+                        char buff[70];
+                        //Default flag is set by default. Setting any other will disable it
+                        strcat(proc, " ");
+                        //All flag blocks all the other flags from reappearing
+                        if(buffers[1]) {
+                            sprintf(buff,"-b all ");
+                            strcat(proc, buff);
+                        }
+                        else {
+                            //As the documentation seems invalid, all buffers habve to be preceeded by -b
+                            if(buffers[2]) {
+                                sprintf(buff,"-b radio "); 
+                                strcat(proc, buff);
+                            }
+                            if(buffers[3]) {
+                                sprintf(buff,"-b events ");
+                                strcat(proc, buff);
+                            }
+                            if(buffers[4]) {
+                                sprintf(buff,"-b main "); 
+                                strcat(proc, buff);
+                            }
+                            if(buffers[5]) {
+                                
+                                sprintf(buff,"-b system "); 
+                                strcat(proc, buff);
+                            }
+                            if(buffers[6]) {
+                                sprintf(buff,"-b crash ");
+                                strcat(proc, buff);
+                            }
+                        }
+                        
+                    }
+                    //Drawing startup command into console, to make debugging easier
+                    //TODO: Remove this
+                    printf("%s\n", proc);
+                    
+                    windowElements->process = SpawnProcess(proc);
+                    free(proc);
+                    
+                    
+                    if(!windowElements->process.isRunning) {
+                        ImGui::OpenPopup("Create Failed");
+                    }
                 }
             }
         }
-    }
-    else {
-        if(ImGui::Button("Stop")) {
-            if(windowElements->process.pinfo.hProcess) {
-                CloseProcess(&windowElements->process);
+        else {
+            if(ImGui::Button("Stop")) {
+                if(windowElements->process.pinfo.hProcess) {
+                    CloseProcess(&windowElements->process);
+                }
             }
         }
+        
+        ImGui::SameLine();
+        if(ImGui::Button("Logcat Settings")) {
+            ImGui::OpenPopup("Logcat Parameters");
+        }
+        
+        ImGui::Separator();
     }
-    
-    ImGui::SameLine();
-    if(ImGui::Button("Clear")) {
-        windowElements->logs.Free();
-    }
-    
-    ImGui::SameLine();
-    if(ImGui::Button("Settings")) {
-        ImGui::OpenPopup("Logcat Parameters");
-    }
-    
-    ImGui::Separator();
-    
     
     if(ImGui::BeginPopupModal("Create Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Failed to create ADB process!");
@@ -385,7 +398,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
         ImGui::Text("Path to ADB: %s", settings.pathToAdb);
         
         if(ImGui::Button("Browse...")) {
-            OpenFileDialog(settings.pathToAdb, 1024);
+            OpenFileDialog(settings.pathToAdb, IM_ARRAYSIZE(settings.pathToAdb));
         }
         
         ImGui::EndChild();
