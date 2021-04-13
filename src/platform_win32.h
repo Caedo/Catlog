@@ -24,4 +24,15 @@ struct ProcessData {
     HANDLE childErrRead;
 };
 
+//Takes path to ADB instance and CLArray containing ADB arguments
+//Then invokes SpawnProcess(char* path) with startup command built of said arguments
+ProcessData SpawnProcess(char* path, CLArray<char*> params);
+
+//Takes path to ADB instance, number of desired ADB arguments, and said arguments
+//Then invokes SpawnProcess(char* path) with startup command built of said arguments
+ProcessData SpawnProcess(int param_count, char* path, ...);
+
+//Takes path combined with all startup arguments. Path is actually full startup command
+ProcessData SpawnProcess(char* path);
+
 #endif //PLATFORM_WIN32_H

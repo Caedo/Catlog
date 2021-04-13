@@ -1,4 +1,4 @@
-
+#include <stdarg.h>
 static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, SECURITY_ATTRIBUTES* attributes)
 {
     static int id = 0;
@@ -30,6 +30,41 @@ static void CreateNamepPipePair(HANDLE* read, HANDLE* write, DWORD bufferSize, S
     assert(*write != INVALID_HANDLE_VALUE);
 }
 
+ProcessData SpawnProcess(char* path, CLArray<char*> params){
+    int launch_size = (int)strlen(path)+1;
+    char* launch = (char*)malloc(launch_size);
+    strcpy(launch, path);
+    for(int i=0; i<params.count; i++){
+        char* param = params[i];
+        launch_size += (int)strlen(param)+1;
+        launch = (char*)realloc(launch, launch_size);
+        strcat(launch, " ");
+        strcat(launch, param);
+    }
+    //TODO: Remove debugging console print
+    //printf("%s\n", launch);
+    
+    return SpawnProcess(launch);
+}
+
+ProcessData SpawnProcess(int param_count, char* path, ...) {
+    int launch_size = (int)strlen(path)+1;
+    char* launch = (char*)malloc(launch_size);
+    strcpy(launch, path);
+    va_list params;
+    va_start(params, path);
+    for(int i=0; i<param_count; i++){
+        char* param = va_arg(params, char*);
+        launch_size += (int)strlen(param)+1;
+        launch = (char*)realloc(launch, launch_size);
+        strcat(launch, " ");
+        strcat(launch, param);
+    }
+    //TODO: Remove debugging console print
+    //printf("%s\n", launch);
+    
+    return SpawnProcess(launch);
+}
 
 ProcessData SpawnProcess(char* path) {
     ProcessData pData = {};
