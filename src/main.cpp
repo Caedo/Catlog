@@ -1,7 +1,6 @@
 #ifndef PREPROC_GEN
 
 #include <stdio.h>
-#include <fstream>
 
 #ifdef MTR_ENABLED
 #include "Minitrace/minitrace.h"
@@ -44,6 +43,22 @@
 #include "settings.cpp"
 
 
+enum LogcatBufferFlags_ {
+    LogcatBufferFlags_None   = 0,
+    LogcatBufferFlags_Radio  = 1 << 0,
+    LogcatBufferFlags_Events = 1 << 1,
+    LogcatBufferFlags_Main   = 1 << 2,
+    LogcatBufferFlags_System = 1 << 3,
+    LogcatBufferFlags_Crash  = 1 << 4,
+
+    LogcatBufferFlags_All     = (LogcatBufferFlags_Radio | LogcatBufferFlags_Events | LogcatBufferFlags_Main | LogcatBufferFlags_System | LogcatBufferFlags_Crash),
+
+    // NOTE: According to the documentation, those are default buffers. They can be ommited, but it is easier for me to handle them explicitly
+    LogcatBufferFlags_Default = (LogcatBufferFlags_Main | LogcatBufferFlags_System | LogcatBufferFlags_Crash), 
+};
+
+typedef int LogcatBufferFlags;
+
 struct TagPriorityPair {
     char tag[64];
     LogPriority priority;
@@ -68,6 +83,8 @@ struct WindowElements {
     ImGuiTextFilter tagFilter;
     ImGuiTextFilter messageFilter;
     int priorityIndex;
+
+    LogcatBufferFlags bufferFlags;
     
     // TODO: change to opaque pointer or other cross-platform stuff
     ProcessData process;
@@ -227,12 +244,15 @@ void DrawMenuBar() {
                 SaveFileDialog(&pathStr);
                 
                 if(path[0] != 0) {
-                    std::fstream file(path, std::ios::out);
+                    FILE* file = fopen(path, "wb");
                     WindowElements *windowElements = windowsData.data;
                     for (int i = 0; i < windowElements->logs.count; i++) {
                         LogData *log = windowElements->logs.data + i;
-                        file << log->rawString << '\n';
+                        fprintf(file, log->rawString);
+                        fprintf(file, "\n");
                     }
+
+                    fclose(file);
                 }
                 
             }
@@ -264,10 +284,7 @@ void DrawMenuBar() {
     }
 }
 
-void DrawLogsWindow(WindowElements* windowElements) {
-    
-    static bool buffers[7] = {true, false, false, false, false, false, false};
-    
+void DrawLogsWindow(WindowElements* windowElements) {   
     ImGui::Begin(windowElements->label, &windowElements->isOpen);
     
     if(windowElements->isOpennedWithFile == false) {
@@ -277,85 +294,43 @@ void DrawLogsWindow(WindowElements* windowElements) {
                     ImGui::OpenPopup("Set ADB Path");
                 }
                 else {
+                    ImGuiTextBuffer strBuffer = {};
                     
-                    i32 pathLen = (i32) strlen(settings.pathToAdb);
-                    pathLen += (i32) strlen(" logcat *:S");
-                    
-                    //Reserving memory for buffer selection part of startup command
-                    pathLen += (i32) strlen(" ");
-                    if(buffers[1]) pathLen += (i32) strlen(" -b all ");
-                    if(buffers[2]) pathLen += (i32) strlen("-b radio ");
-                    if(buffers[3]) pathLen += (i32) strlen("-b events ");
-                    if(buffers[4]) pathLen += (i32) strlen("-b main ");
-                    if(buffers[5]) pathLen += (i32) strlen("-b system ");
-                    if(buffers[6]) pathLen += (i32) strlen("-b crash ");
-                    
-                    int buf_status = 0;
-                    for(int i=0; i<7; i++){
-                        if(buf_status && buffers[i]) pathLen++;
-                        if(buffers[i]) buf_status++;
-                    }
-                    
-                    for(int i = 0; i < windowElements->tags.count; i++) {
-                        pathLen += (i32) strlen(windowElements->tags[i].tag) + 3;
-                    }
-                    
-                    char* proc = (char*) malloc(pathLen + 1);
-                    sprintf(proc, "%s logcat", settings.pathToAdb);
+                    strBuffer.appendf("%s logcat", settings.pathToAdb);
                     if(windowElements->tags.count > 0) {
-                        strcat(proc, " *:S");
+                        // Set all tags to silent, so specified tags will be displayed
+                        strBuffer.append(" *:S");
                     }
                     
                     for(int i = 0; i < windowElements->tags.count; i++) {
-                        char buff[70];
-                        sprintf(buff, " %s:%c", windowElements->tags[i].tag, PriorityToChar(windowElements->tags[i].priority));
-                        
-                        strcat(proc, buff);
+                        strBuffer.appendf("%s:%c", windowElements->tags[i].tag, PriorityToChar(windowElements->tags[i].priority));
+                    }
+    
+                    if(windowElements->bufferFlags == LogcatBufferFlags_All) {
+                        strBuffer.append(" -b all ");
+                    }
+                    else {
+                        // As the documentation seems invalid, all buffers have to be preceeded by -b
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Radio) {
+                            strBuffer.append(" -b radio "); 
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Events) {
+                            strBuffer.append(" -b events ");
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Main) {
+                            strBuffer.append(" -b main ");
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_System) {
+                            strBuffer.append(" -b system ");
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Crash) {
+                            strBuffer.append(" -b crash ");
+                        }
                     }
                     
-                    //Just an indentation/scope block for buffer selection
-                    {
-                        char buff[70];
-                        //Default flag is set by default. Setting any other will disable it
-                        strcat(proc, " ");
-                        //All flag blocks all the other flags from reappearing
-                        if(buffers[1]) {
-                            sprintf(buff,"-b all ");
-                            strcat(proc, buff);
-                        }
-                        else {
-                            //As the documentation seems invalid, all buffers habve to be preceeded by -b
-                            if(buffers[2]) {
-                                sprintf(buff,"-b radio "); 
-                                strcat(proc, buff);
-                            }
-                            if(buffers[3]) {
-                                sprintf(buff,"-b events ");
-                                strcat(proc, buff);
-                            }
-                            if(buffers[4]) {
-                                sprintf(buff,"-b main "); 
-                                strcat(proc, buff);
-                            }
-                            if(buffers[5]) {
-                                
-                                sprintf(buff,"-b system "); 
-                                strcat(proc, buff);
-                            }
-                            if(buffers[6]) {
-                                sprintf(buff,"-b crash ");
-                                strcat(proc, buff);
-                            }
-                        }
-                        
-                    }
-                    //Drawing startup command into console, to make debugging easier
-                    //TODO: Remove this
-                    printf("%s\n", proc);
+                    printf("%s\n", strBuffer.c_str());
                     
-                    windowElements->process = SpawnProcess(proc);
-                    free(proc);
-                    
+                    windowElements->process = SpawnProcess((char*) strBuffer.c_str());
                     
                     if(!windowElements->process.isRunning) {
                         ImGui::OpenPopup("Create Failed");
@@ -480,44 +455,39 @@ void DrawLogsWindow(WindowElements* windowElements) {
                 ImGui::Text("Please select desired adb logcat buffers");
                 ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
                 {
-                    ImGui::Separator();
-                    if(ImGui::Selectable("Default", &buffers[0]) && buffers[0] == true){
-                        buffers[1] = false;
-                        buffers[2] = false;
-                        buffers[3] = false;
-                        buffers[4] = false;
-                        buffers[5] = false;
-                        buffers[6] = false;
+                    // TODO: Move to window initializaition...?
+                    if(windowElements->bufferFlags == 0) {
+                        windowElements->bufferFlags = LogcatBufferFlags_Default;
                     }
-                    if(ImGui::Selectable("All", &buffers[1]) && buffers[1] == true){
-                        buffers[0] = false;
-                        buffers[2] = false;
-                        buffers[3] = false;
-                        buffers[4] = false;
-                        buffers[5] = false;
-                        buffers[6] = false;
+
+                    if(ImGui::Selectable("Default", windowElements->bufferFlags == LogcatBufferFlags_Default)) {
+                        windowElements->bufferFlags = LogcatBufferFlags_Default;
                     }
+
+                    if(ImGui::Selectable("All", windowElements->bufferFlags == LogcatBufferFlags_All)) {
+                        windowElements->bufferFlags = LogcatBufferFlags_All;
+                    }
+
                     ImGui::Separator();
-                    if(ImGui::Selectable("Radio", &buffers[2]) && buffers[2] == true){
-                        buffers[0] = false;
-                        buffers[1] = false;
+                    if(ImGui::Selectable("Radio", windowElements->bufferFlags & LogcatBufferFlags_Radio)) {
+                        windowElements->bufferFlags ^= LogcatBufferFlags_Radio;
                     } 
-                    if(ImGui::Selectable("Events", &buffers[3]) && buffers[3] == true){
-                        buffers[0] = false;
-                        buffers[1] = false;
-                    }; 
-                    if(ImGui::Selectable("Main", &buffers[4]) && buffers[4] == true){
-                        buffers[0] = false;
-                        buffers[1] = false;
-                    }; 
-                    if(ImGui::Selectable("System", &buffers[5]) && buffers[5] == true){
-                        buffers[0] = false;
-                        buffers[1] = false;
-                    }; 
-                    if(ImGui::Selectable("Crash", &buffers[6]) && buffers[6] == true){
-                        buffers[0] = false;
-                        buffers[1] = false;
-                    }; 
+
+                    if(ImGui::Selectable("Events", windowElements->bufferFlags & LogcatBufferFlags_Events)) {
+                        windowElements->bufferFlags ^= LogcatBufferFlags_Events;
+                    }
+
+                    if(ImGui::Selectable("Main", windowElements->bufferFlags & LogcatBufferFlags_Main)) {
+                        windowElements->bufferFlags ^= LogcatBufferFlags_Main;
+                    }
+
+                    if(ImGui::Selectable("System", windowElements->bufferFlags & LogcatBufferFlags_System)) {
+                        windowElements->bufferFlags ^= LogcatBufferFlags_System;
+                    }
+
+                    if(ImGui::Selectable("Crash", windowElements->bufferFlags & LogcatBufferFlags_Crash)) {
+                        windowElements->bufferFlags ^= LogcatBufferFlags_Crash;
+                    }
                 }
                 ImGui::PopItemWidth();
                 
