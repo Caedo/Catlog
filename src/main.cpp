@@ -198,11 +198,17 @@ void DrawSettingsMenu() {
     
     ImGui::EndChild();
     ImGui::Separator();
-    
+
     if(ImGui::Button("Save")) {
         SaveSettings(&settings);
     }
-    
+
+    ImGui::SameLine();
+    if(ImGui::Button("Save & Exit")) {
+        SaveSettings(&settings);
+        showSettingsWindow = false;
+    }
+
     ImGui::End();
 }
 
@@ -284,87 +290,7 @@ void DrawMenuBar() {
     }
 }
 
-void DrawLogsWindow(WindowElements* windowElements) {   
-    ImGui::Begin(windowElements->label, &windowElements->isOpen);
-    
-    if(windowElements->isOpennedWithFile == false) {
-        if(windowElements->process.isRunning == false) {
-            if(ImGui::Button("Start")) {
-                if(settings.pathToAdb == NULL || settings.pathToAdb[0] == 0) {
-                    ImGui::OpenPopup("Set ADB Path");
-                }
-                else {
-                    ImGuiTextBuffer strBuffer = {};
-                    
-                    strBuffer.appendf("%s logcat", settings.pathToAdb);
-                    if(windowElements->tags.count > 0) {
-                        // Set all tags to silent, so specified tags will be displayed
-                        strBuffer.append(" *:S");
-                    }
-                    
-                    for(int i = 0; i < windowElements->tags.count; i++) {
-                        strBuffer.appendf("%s:%c", windowElements->tags[i].tag, PriorityToChar(windowElements->tags[i].priority));
-                    }
-    
-                    if(windowElements->bufferFlags == LogcatBufferFlags_All) {
-                        strBuffer.append(" -b all ");
-                    }
-                    else {
-                        // As the documentation seems invalid, all buffers have to be preceeded by -b
-                        if(windowElements->bufferFlags & LogcatBufferFlags_Radio) {
-                            strBuffer.append(" -b radio "); 
-                        }
-                        if(windowElements->bufferFlags & LogcatBufferFlags_Events) {
-                            strBuffer.append(" -b events ");
-                        }
-                        if(windowElements->bufferFlags & LogcatBufferFlags_Main) {
-                            strBuffer.append(" -b main ");
-                        }
-                        if(windowElements->bufferFlags & LogcatBufferFlags_System) {
-                            strBuffer.append(" -b system ");
-                        }
-                        if(windowElements->bufferFlags & LogcatBufferFlags_Crash) {
-                            strBuffer.append(" -b crash ");
-                        }
-                    }
-                    
-                    printf("%s\n", strBuffer.c_str());
-                    
-                    windowElements->process = SpawnProcess((char*) strBuffer.c_str());
-                    
-                    if(!windowElements->process.isRunning) {
-                        ImGui::OpenPopup("Create Failed");
-                    }
-                }
-            }
-        }
-        else {
-            if(ImGui::Button("Stop")) {
-                if(windowElements->process.pinfo.hProcess) {
-                    CloseProcess(&windowElements->process);
-                }
-            }
-        }
-        
-        ImGui::SameLine();
-        if(ImGui::Button("Logcat Settings")) {
-            ImGui::OpenPopup("Logcat Parameters");
-        }
-        
-        ImGui::Separator();
-    }
-    
-    if(ImGui::BeginPopupModal("Create Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("Failed to create ADB process!");
-        ImGui::Text("Please make sure that your path to ADB executable is correct.");
-        
-        ImGui::Separator();
-        if(ImGui::Button("Close")) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-    
+void DrawSetADBPathPopup() {
     ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Once);
     if(ImGui::BeginPopupModal("Set ADB Path")) {
         ImGui::BeginChild("Please, set the path :>", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
@@ -396,7 +322,23 @@ void DrawLogsWindow(WindowElements* windowElements) {
         
         ImGui::EndPopup();
     }
-    
+}
+
+void DrawProcessCreateFailedPopup() {
+    if(ImGui::BeginPopupModal("Create Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Failed to create ADB process!");
+        ImGui::Text("Please make sure that your path to ADB executable is correct.");
+        
+        ImGui::Separator();
+        if(ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void DrawLogcatParametersPopup(WindowElements* windowElements) {
+
     ImGui::SetNextWindowSize(ImVec2(475, 200), ImGuiCond_Once);
     if(ImGui::BeginPopupModal("Logcat Parameters")) {
         
@@ -455,7 +397,6 @@ void DrawLogsWindow(WindowElements* windowElements) {
                 ImGui::Text("Please select desired adb logcat buffers");
                 ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
                 {
-                    // TODO: Move to window initializaition...?
                     if(windowElements->bufferFlags == 0) {
                         windowElements->bufferFlags = LogcatBufferFlags_Default;
                     }
@@ -506,8 +447,96 @@ void DrawLogsWindow(WindowElements* windowElements) {
         
         ImGui::EndPopup();
     }
-    
-    
+}
+
+void DrawLogsWindow(WindowElements* windowElements) {
+    ImGui::Begin(windowElements->label, &windowElements->isOpen);
+
+
+    ImGui::BeginChild("left pane", ImVec2(90, 0), true);
+
+    DrawProcessCreateFailedPopup();
+    DrawSetADBPathPopup();
+    DrawLogcatParametersPopup(windowElements);
+
+    if(windowElements->isOpennedWithFile == false) {
+        if(windowElements->process.isRunning == false) {
+            if(ImGui::Button("Start")) {
+                if(settings.pathToAdb == NULL || settings.pathToAdb[0] == 0) {
+                    ImGui::OpenPopup("Set ADB Path");
+                }
+                else {
+                    ImGuiTextBuffer strBuffer = {};
+                    
+                    strBuffer.appendf("%s logcat", settings.pathToAdb);
+                    if(windowElements->tags.count > 0) {
+                        // Set all tags to silent, so specified tags will be displayed
+                        strBuffer.append(" *:S");
+                    }
+                    
+                    for(int i = 0; i < windowElements->tags.count; i++) {
+                        strBuffer.appendf("%s:%c", windowElements->tags[i].tag, PriorityToChar(windowElements->tags[i].priority));
+                    }
+
+                    if(windowElements->bufferFlags == LogcatBufferFlags_All) {
+                        strBuffer.append(" -b all ");
+                    }
+                    else {
+                        // As the documentation seems invalid, all buffers have to be preceeded by -b
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Radio) {
+                            strBuffer.append(" -b radio "); 
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Events) {
+                            strBuffer.append(" -b events ");
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Main) {
+                            strBuffer.append(" -b main ");
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_System) {
+                            strBuffer.append(" -b system ");
+                        }
+                        if(windowElements->bufferFlags & LogcatBufferFlags_Crash) {
+                            strBuffer.append(" -b crash ");
+                        }
+                    }
+                    
+                    printf("%s\n", strBuffer.c_str());
+                    
+                    windowElements->process = SpawnProcess((char*) strBuffer.c_str());
+                    
+                    if(!windowElements->process.isRunning) {
+                        ImGui::OpenPopup("Create Failed");
+                    }
+                }
+            }
+        }
+        else {
+            if(ImGui::Button("Stop")) {
+                if(windowElements->process.pinfo.hProcess) {
+                    CloseProcess(&windowElements->process);
+                }
+            }
+        }
+
+        if(ImGui::Button("Parameters")) {
+            ImGui::OpenPopup("Logcat Parameters");
+        }
+        
+        ImGui::Separator();
+    }
+
+    ImGui::Text("Count: %d", windowElements->logs.count);
+    if(ImGui::Button("Clear logs")) {
+        // TODO: Memory leak
+        windowElements->logs.Clear();
+    }
+
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::BeginChild("Table");
+
     ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
     {
         bool filtersEdited = false;
@@ -552,13 +581,13 @@ void DrawLogsWindow(WindowElements* windowElements) {
         windowElements->messageFilter.Clear();
         windowElements->priorityIndex = 0;
     }
-    
-    ImGui::Text("Count: %d", windowElements->logs.count);
-    
+
+
+
     ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable | 
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | 
         ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | 
-        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+        ImGuiTableFlags_ScrollY;
     
     MTR_BEGIN("main", "table render");
     if (ImGui::BeginTable("##table1", 7, tableFlags))
@@ -581,7 +610,7 @@ void DrawLogsWindow(WindowElements* windowElements) {
         clipper.Begin(elementsCount);
         
         while(clipper.Step())
-            for (int logIndex = clipper.DisplayStart; logIndex < clipper.DisplayEnd; logIndex++)
+        for (int logIndex = clipper.DisplayStart; logIndex < clipper.DisplayEnd; logIndex++)
         {
             u32 index = filtersActive ? windowElements->filteredLogIndices[logIndex] : logIndex;
             LogData* log = windowElements->logs.data + index;
@@ -645,9 +674,13 @@ void DrawLogsWindow(WindowElements* windowElements) {
         
         ImGui::EndTable();
     }
+
+    ImGui::EndChild();
+    ImGui::EndGroup();
+
     MTR_END("main", "table render");
     ImGui::End();
-    
+
 }
 
 int main()
