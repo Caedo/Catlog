@@ -1,15 +1,13 @@
-#ifndef PREPROC_GEN
-
 #include <stdio.h>
 
-#ifdef MTR_ENABLED
-#include "Minitrace/minitrace.h"
-#include "Minitrace/minitrace.c"
-#else
-#define MTR_BEGIN
-#define MTR_END
-#define MTR_SCOPE
-#endif // MTR_ENABLED
+// #ifdef MTR_ENABLED
+//     #include "Minitrace/minitrace.h"
+//     #include "Minitrace/minitrace.c"
+// #else
+//     #define MTR_BEGIN
+//     #define MTR_END
+//     #define MTR_SCOPE
+// #endif // MTR_ENABLED
 
 #include "glad.c"
 
@@ -28,7 +26,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#endif //PREPROC_GEN
 
 #include "common.h"
 #include "CLArray.h"
@@ -690,7 +687,7 @@ int main()
     MTR_META_PROCESS_NAME("Catlog");
     MTR_META_THREAD_NAME("main thread");
 #endif
-    
+
     OpenNewWindow();
     
     // Setup window

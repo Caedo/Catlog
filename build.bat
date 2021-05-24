@@ -9,16 +9,26 @@ set linker_path="../lib/"
 
 set main_file="../src/main.cpp"
 
+if "%1" == "release" (
+    echo "BUILDING RELEASE!"
+    set compile_flags=%compile_flags% /O2
+    set linker_flags=%linker_flags% /SUBSYSTEM:windows /ENTRY:mainCRTStartup
+) else (
+    set compile_flags=%compile_flags% /fsanitize=address
+)
+
+if "%1" == "trace" (
+    set compile_flags=%compile_flags% -DMTR_ENABLED
+)
+
+
 if not exist build mkdir build
 pushd build
 
-REM Build With trace anabled
+REM Build With trace enabled
 REM start /b /wait "" "cl.exe" -DMTR_ENABLED %compile_flags% %main_file% /link %linker_flags% /libpath:%linker_path% /out:%exe_name%.exe
 
 start /b /wait "" "cl.exe" %compile_flags%  %main_file% /link %linker_flags% /libpath:%linker_path% /out:%exe_name%.exe
-
-REM Generate file after precesor
-REM start /b /wait "" "cl.exe" %compile_flags% /P /C -DPREPROC_GEN  %main_file%
 
 copy ..\lib\* . >NUL
 copy ..\resources\* . >NUL

@@ -3,7 +3,7 @@
 if NOT "%Platform%" == "X64" IF NOT "%Platform%" == "x64" (call vcvarsall x64)
 
 set exe_name=dummy_logcat
-set compile_flags= -nologo /Zi /FC 
+set compile_flags= -nologo /Zi /FC  /fsanitize=address
 set linker_flags= user32.lib
 
 if not exist build mkdir build

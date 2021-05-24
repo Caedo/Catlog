@@ -5,7 +5,7 @@
 
 #include <windows.h>
 
-#include "types.h"
+#include "common.h"
 
 //char* messages[] = {
 //"01-18 13:40:04.232  1817  1817 I SystemServiceManager: Starting com.android.server.power.ThermalManagerService\n",
@@ -54,20 +54,43 @@ TestMessage messages[] = {
     {{1, 18, 2021}, {13, 40, 4.232}, 1817, 1817, Debug, "SystemServer", "Test warning message"},
 };
 
+char* devices[] = {"Test 1 :>\tdevice", "Test 2 :|\tdevice", "Test 3 :<\tdevice"};
+
 int main(int argc, char* argv[]) {
     const int messagesPerBatch = 3;
     srand(time(NULL));
     
-    int messagesCount = (int) sizeof(messages) / sizeof(*messages);
-    while(true) {
-        for(int i = 0; i < messagesPerBatch; i++) {
-            int index = rand() % messagesCount;
-            TestMessage log = messages[index];
+    if(argc == 1) {
+        return 0;
+    }
+    
+    if(strcmp(argv[1], "logcat") == 0) {
+        int messagesCount = (int) sizeof(messages) / sizeof(*messages);
+        while(true) {
+            for(int i = 0; i < messagesPerBatch; i++) {
+                int index = rand() % messagesCount;
+                TestMessage log = messages[index];
+                
+                printf("%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.month, log.date.day, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
+            }
             
-            printf("%d-%d %d:%d:%.3f %d %d %c %s: %s\n", log.date.month, log.date.day, log.time.hours, log.time.minutes, log.time.seconds, log.PID, log.TID, PriorityToChar(log.priority), log.tag, log.message);
+            fflush(stdout);
+            Sleep(50);
+        }
+    }
+    
+    if(strcmp(argv[1], "devices") == 0) {
+        Sleep(1000);
+        
+        printf("List of devices attached\n");
+        
+        Sleep(rand() % 500 + 250);
+        
+        for(int i = 0; i < 3; i++) {
+            printf(devices[i]);
+            printf("\n");
         }
         
         fflush(stdout);
-        Sleep(50);
     }
 }
