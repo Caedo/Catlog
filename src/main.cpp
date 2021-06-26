@@ -1,13 +1,13 @@
 #include <stdio.h>
 
-// #ifdef MTR_ENABLED
-//     #include "Minitrace/minitrace.h"
-//     #include "Minitrace/minitrace.c"
-// #else
-//     #define MTR_BEGIN
-//     #define MTR_END
-//     #define MTR_SCOPE
-// #endif // MTR_ENABLED
+#ifdef MTR_ENABLED
+    #include "Minitrace/minitrace.h"
+    #include "Minitrace/minitrace.c"
+#else
+    #define MTR_BEGIN
+    #define MTR_END
+    #define MTR_SCOPE
+#endif // MTR_ENABLED
 
 #include "glad.c"
 
@@ -167,7 +167,7 @@ void DrawSettingsMenu() {
     
     ImGui::BeginChild("Tags", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 5)); 
     if(ImGui::BeginTabBar("tabs", ImGuiTabBarFlags_None)) {
-        if (ImGui::BeginTabItem("ADB")) {
+        if(ImGui::BeginTabItem("ADB")) {
             ImGui::Text("Path to ADB: %s", settings.pathToAdb);
             
             ImGui::SameLine();
@@ -523,9 +523,16 @@ void DrawLogsWindow(WindowElements* windowElements) {
     }
 
     ImGui::Text("Count: %d", windowElements->logs.count);
+
     if(ImGui::Button("Clear logs")) {
-        // TODO: Memory leak
+
+        for(int i = 0; i < windowElements->logs.count; i++) {
+            free(windowElements->logs[i].message);
+            free(windowElements->logs[i].tag);
+        }
+
         windowElements->logs.Clear();
+        windowElements->filteredLogIndices.Clear();
     }
 
     ImGui::EndChild();
