@@ -347,7 +347,7 @@ void DrawLogcatParametersPopup(WindowElements* windowElements) {
                     for(int i = 0; i < windowElements->tags.count; i++) {
                         ImGui::PushID(i);
                         
-                        ImGui::InputText("Tag", windowElements->tags.data[i].tag, 64);
+                        ImGui::InputText("Tag", windowElements->tags[i].tag, 64);
                         ImGui::SameLine();
                         
                         if (ImGui::BeginCombo("Priority", LogPriorityName[(int)(windowElements->tags.data[i].priority) ]))
@@ -355,7 +355,7 @@ void DrawLogcatParametersPopup(WindowElements* windowElements) {
                             // we want to skip "None" priority
                             for (int n = 1; n < IM_ARRAYSIZE(LogPriorityName); n++)
                             {
-                                const bool is_selected = ((int) (windowElements->tags.data[n].priority == n));
+                                const bool is_selected = ((int) (windowElements->tags[i].priority == n));
                                 if (ImGui::Selectable(LogPriorityName[n], is_selected)) {
                                     windowElements->tags.data[i].priority = (LogPriority) n;
                                 }
